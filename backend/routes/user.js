@@ -10,6 +10,7 @@ router.post('/loginotp', loginWithOTP)
 router.post('/verify-otp', verifyOTP);
 router.post('/loginMob', loginUserMob)
 //signup route
+
 router.post('/signup', signupUser)
 //get users
 router.get('/list', getUsers)
