@@ -66,8 +66,8 @@ export default function LoginPage() {
 
         <div className="relative flex max-w-sm items-start gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 text-sm backdrop-blur">
           <Bell className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>            Stay updated with the latest news and announcements.
-
+          <p>
+            Stay updated with the latest news and announcements.
           </p>
         </div>
       </aside>
@@ -80,10 +80,10 @@ export default function LoginPage() {
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
           <h1 className="text-3xl font-bold tracking-tight text-blue-950 dark:text-white">
-            Log in
+            Sign up
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Enter your details to open your CampusLink account.
+            Enter your details to create your CampusLink account.
           </p>
 
           <Button
@@ -122,12 +122,6 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-300"
-                >
-                  Forgot password?
-                </Link>
               </div>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -182,9 +176,9 @@ export default function LoginPage() {
           </form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
-            New to CampusLink?{" "}
-            <Link href="/signup" className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-300">
-              Create an account
+            Already have an account?{" "}
+            <Link href="/login" className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-300">
+              Log in
             </Link>
           </p>
         </div>
