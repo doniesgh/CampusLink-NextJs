@@ -28,8 +28,6 @@ router.patch('/:id', updateUser)
 //UPDATE Profil
 router.patch('/:id', updateProfil)
 //client number
-//helpdesk number
-//technicien number
 router.get('/profile/:userId', userController.getUserById);
 router.get('/role/:role', userController.getUserByRole);
 module.exports = router 
