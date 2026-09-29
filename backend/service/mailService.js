@@ -143,7 +143,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'tunisys05@gmail.com',
-    pass: 'uyzj sisg xfqt qmpt',
+
   },
   port: 587,
   secure: false,
