@@ -1,26 +1,51 @@
-const jwt = require('jsonwebtoken')
-const User = require('../models/userModel')
+const mongoose = require('mongoose');
+const User = require('../models/userModel');
+const HttpError = require('../utils/httpError');
+const { verifyAccessToken } = require('../service/tokenService');
 
+// Returns the token from "Authorization: Bearer <token>", or null when the header is absent or malformed.
+const getBearerToken = (req) => {
+  const match = /^Bearer\s+(\S+)\s*$/i.exec(req.headers.authorization || '');
+  return match ? match[1] : null;
+};
 
-const requireAuth = async (req, res, next) => {
+// Verifies the access token and loads its user. Throws HttpError(401) on failure.
+const authenticate = async (token) => {
+  const payload = verifyAccessToken(token);
 
-  const { authorization } = req.headers
-
-  if (!authorization) {
-    return res.status(401).json({error: 'Authorization token required'})
+  if (!mongoose.isObjectIdOrHexString(payload.sub)) {
+    throw new HttpError(401, 'INVALID_TOKEN', 'Invalid access token');
   }
 
-  const token = authorization.split(' ')[1]
-  try {
-    const { _id } = jwt.verify(token, process.env.SECRET);
-    console.log('_id:', _id); // Add this line for debugging
-    req.user = await User.findOne({ _id }).select('_id role firstname lastname email');
-    console.log('req.user:', req.user); // Add this line for debugging
-    next();
-} catch (error) {
-    console.log(error);
-    res.status(401).json({ error: 'Request is not authorized' });
-}
-}
+  const user = await User.findById(payload.sub);
+  if (!user) {
+    throw new HttpError(401, 'INVALID_TOKEN', 'Invalid access token');
+  }
 
-module.exports = requireAuth
+  return user;
+};
+
+const requireAuth = async (req, res, next) => {
+  const token = getBearerToken(req);
+  if (!token) {
+    throw new HttpError(401, 'AUTH_REQUIRED', 'Authentication required');
+  }
+
+  req.user = await authenticate(token);
+  next();
+};
+
+// Use after requireAuth. The role is read from the database, so a role change applies immediately.
+const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (!req.user) {
+      throw new HttpError(401, 'AUTH_REQUIRED', 'Authentication required');
+    }
+    if (!roles.includes(req.user.role)) {
+      throw new HttpError(403, 'FORBIDDEN', 'You do not have permission to perform this action');
+    }
+    next();
+  };
+
+module.exports = { requireAuth, requireRole, getBearerToken, authenticate };

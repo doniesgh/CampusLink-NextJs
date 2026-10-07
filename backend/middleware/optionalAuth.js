@@ -1,27 +1,20 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/userModel');
+const HttpError = require('../utils/httpError');
+const { getBearerToken, authenticate } = require('./requireAuth');
 
+// Sets req.user when a valid access token is sent; otherwise continues anonymously.
 const optionalAuth = async (req, res, next) => {
-  const { authorization } = req.headers;
+  const token = getBearerToken(req);
 
-  if (!authorization) {
-    return next();
+  if (token) {
+    try {
+      req.user = await authenticate(token);
+    } catch (error) {
+      // Auth is optional: ignore invalid or expired tokens, but not database failures.
+      if (!(error instanceof HttpError)) throw error;
+    }
   }
 
-  const parts = authorization.split(' ');
-  const token = parts.length === 2 ? parts[1] : null;
-  if (!token) {
-    return next();
-  }
-
-  try {
-    const { _id } = jwt.verify(token, process.env.SECRET);
-    req.user = await User.findOne({ _id }).select('_id role firstname lastname email');
-  } catch (error) {
-    // Auth is optional: ignore invalid tokens and continue.
-  }
-
-  return next();
+  next();
 };
 
 module.exports = optionalAuth;
