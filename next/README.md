@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CampusLink web (Next.js)
 
-## Getting Started
+Next.js 16 (App Router) + React 19 + Tailwind CSS v4. Talks to the CampusLink backend (`../backend`).
 
-First, run the development server:
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local   # API_URL=http://localhost:4000
+npm install
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Checks: `npx tsc --noEmit`, `npm run lint`, `npm run build`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment (server-only)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable        | Default                 | Purpose                                                                 |
+| --------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `API_URL`       | `http://localhost:4000` | Base URL of the backend API.                                            |
+| `COOKIE_SECURE` | production only         | `true`/`false` overrides the `Secure` flag of the session cookies.      |
 
-## Learn More
+## How authentication works
 
-To learn more about Next.js, take a look at the following resources:
+The browser never calls the backend: Server Actions (`app/actions/auth.ts`), the proxy (`proxy.ts`)
+and Server Components call it through `lib/api.ts`, and the tokens live in httpOnly cookies
+(`lib/session.ts`):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `cl_access`: access token (JWT), kept for the token's lifetime.
+- `cl_refresh`: refresh token, 30 days with "Keep me signed in", otherwise a browser-session cookie.
+- `cl_remember`: remembers that choice for later refreshes.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`proxy.ts` (Next 16's renamed middleware) protects `/dashboard`, sends signed-in users away from
+`/login` and `/signup`, and refreshes an expired access token before the page renders.
 
-## Deploy on Vercel
+## Pages
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`/` landing · `/login` (with the 2FA code step) · `/signup` · `/forgot-password` ·
+`/reset-password?token=...` · `/dashboard` (protected).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes for E2E tests
+
+- Next.js adds a hidden route announcer with `role="alert"`; scope alert lookups to the page,
+  e.g. `page.getByRole('main').getByRole('alert')`.
+- On pages with several password fields use `getByLabel('Password', { exact: true })`.
+- The dashboard shows the role as a label ("Student"); the raw value is in `[data-role]`.
