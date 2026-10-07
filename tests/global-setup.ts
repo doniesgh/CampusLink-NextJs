@@ -24,7 +24,9 @@ async function warmUpWebApp() {
   const routes = ['/', '/login', '/signup', '/forgot-password', '/reset-password?token=warm-up'];
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ baseURL: WEB_URL });
+    // English UI like the e2e project: the app picks its language from Accept-Language (fr by default),
+    // and a browser launched outside the test runner uses the system locale.
+    const page = await browser.newPage({ baseURL: WEB_URL, locale: 'en-US' });
     page.setDefaultTimeout(180_000);
 
     for (const route of routes) {

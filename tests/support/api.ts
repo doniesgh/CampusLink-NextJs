@@ -2,6 +2,15 @@ import { expect, test as base, type APIRequestContext } from '@playwright/test';
 import { createAdmin, DEFAULT_PASSWORD, uniqueEmail } from './accounts';
 import { API_URL, type Role } from './env';
 
+/** `group` of a user (phase-1 contract, section 1); null for non-students and students without a group. */
+export type UserGroup = {
+  id: string;
+  name: string;
+  level: number;
+  academicYear: string;
+  program: { id: string; name: string; code: string };
+};
+
 export type User = {
   id: string;
   firstname: string;
@@ -9,6 +18,8 @@ export type User = {
   email: string;
   role: Role;
   twoFactorEnabled: boolean;
+  locale: 'fr' | 'en';
+  group: UserGroup | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -25,7 +36,18 @@ type CallOptions = {
   params?: Record<string, string | number>;
 };
 
-export const USER_KEYS = ['createdAt', 'email', 'firstname', 'id', 'lastname', 'role', 'twoFactorEnabled', 'updatedAt'];
+export const USER_KEYS = [
+  'createdAt',
+  'email',
+  'firstname',
+  'group',
+  'id',
+  'lastname',
+  'locale',
+  'role',
+  'twoFactorEnabled',
+  'updatedAt',
+];
 
 /** Keys that must never appear in any response body (secrets and internals). */
 const FORBIDDEN_KEYS = new Set([
@@ -174,6 +196,7 @@ export function expectUser(user: unknown, expected: Partial<User> = {}): void {
     email: expect.any(String),
     role: expect.stringMatching(/^(STUDENT|TEACHER|ADMIN|ALUMNI)$/),
     twoFactorEnabled: expect.any(Boolean),
+    locale: expect.stringMatching(/^(fr|en)$/),
     createdAt: expect.any(String),
     updatedAt: expect.any(String),
     ...expected,

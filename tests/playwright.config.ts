@@ -10,6 +10,14 @@ import {
   NEXT_DIR,
   OTP_MAX_ATTEMPTS,
   OUTBOX_FILE,
+  PUSH_OUTBOX_FILE,
+  RATE_LIMIT_AUTH_MAX,
+  SECURITY_API_PORT,
+  SECURITY_API_URL,
+  SECURITY_MONGO_URI,
+  STORAGE_DIR,
+  TEST_VAPID,
+  TMP_DIR,
   WEB_PORT,
   WEB_URL,
 } from './support/env';
@@ -22,7 +30,8 @@ import {
  * The webServer entries start in order, each one waiting for the previous one to be ready:
  * 1. a throwaway MongoDB (mongodb-memory-server, no Docker needed),
  * 2. the backend, configured for tests (emails go to the outbox file, never to SMTP),
- * 3. the Next.js app (skipped when only the "api" project runs).
+ * 3. a second backend on 4101 with rate limiting on (only when api/security.spec.ts can run),
+ * 4. the Next.js app (skipped when only the "api" project runs without api/security.spec.ts).
  * They are stopped when the run ends. Development ports (3000 / 4000 / 27017) are never used.
  *
  * E2E_NEXT_MODE=start runs `next build` + `next start` instead of `next dev` (needed when your own
@@ -41,9 +50,36 @@ const selectedProjects = (() => {
   }
   return names;
 })();
-const needsWeb = selectedProjects.length === 0 || selectedProjects.some((name) => name !== 'api');
-// Read by global-setup.ts (same process) to decide whether to warm up the Next.js routes.
-process.env.CAMPUSLINK_TEST_WEB = needsWeb ? '1' : '0';
+// Positional arguments of `playwright test` (file filters such as "api/admin.spec.ts").
+const fileFilters = (() => {
+  const valueOptions = new Set(['-c', '--config', '-g', '--grep', '-G', '--grep-invert', '--project', '-j', '--workers',
+    '--reporter', '--retries', '--timeout', '--global-timeout', '--max-failures', '--output', '--repeat-each', '--shard',
+    '--trace', '--tsconfig']);
+  const start = process.argv.indexOf('test');
+  if (start === -1) return [];
+  const args = process.argv.slice(start + 1);
+  return args.filter((arg, i) => !arg.startsWith('-') && !valueOptions.has(args[i - 1]) && !selectedProjects.includes(arg));
+})();
+const runsProject = (name: string) => selectedProjects.length === 0 || selectedProjects.includes(name);
+const needsE2e = runsProject('e2e');
+// api/security.spec.ts also checks the web app (BFF, redirects, headers) and uses a second backend.
+const needsSecurity = runsProject('api') && (fileFilters.length === 0 || fileFilters.some((f) => /security/i.test(f)));
+const needsWeb = needsE2e || selectedProjects.some((name) => name !== 'api' && name !== 'e2e') || needsSecurity;
+// Read by global-setup.ts (same process) to decide whether to warm up the Next.js pages in a browser.
+process.env.CAMPUSLINK_TEST_WEB = needsE2e ? '1' : '0';
+
+/** Phase-1 settings shared by both backends. Values set here take precedence over backend/.env. */
+const phase1BackendEnv = {
+  APP_TIMEZONE: 'Africa/Tunis',
+  TRUST_PROXY: 'loopback',
+  // Uploads, pushes and emails stay in tests/.tmp (reset by scripts/test-db.mjs).
+  STORAGE_DIR,
+  MAX_UPLOAD_MB: '10',
+  PUSH_OUTBOX_FILE,
+  SCHEDULER_INTERVAL_MS: '1000',
+  NOTIFY_HORIZON_DAYS: '14',
+  RATE_LIMIT_WINDOW_MS: '900000',
+};
 
 const nextBin = 'node node_modules/next/dist/bin/next';
 const nextCommand =
@@ -117,8 +153,47 @@ export default defineConfig({
         SMTP_USER: '',
         SMTP_PASS: '',
         SMTP_FROM: 'CampusLink Tests <no-reply@campuslink.test>',
+        ...phase1BackendEnv,
+        PUBLIC_API_URL: API_URL,
+        // Rate limiting is tested on the security backend only (the suite logs in many times).
+        RATE_LIMIT_ENABLED: 'false',
+        // Empty values override the developer's keys in backend/.env: push stays disabled (503 PUSH_DISABLED).
+        VAPID_PUBLIC_KEY: '',
+        VAPID_PRIVATE_KEY: '',
       },
     },
+    ...(needsSecurity
+      ? [
+          {
+            // Second backend for api/security.spec.ts: own database, rate limiting ON, test VAPID keys.
+            name: 'backend-security',
+            command: 'node app.js',
+            cwd: BACKEND_DIR,
+            url: `${SECURITY_API_URL}/api/health`,
+            timeout: 60_000,
+            reuseExistingServer: false,
+            env: {
+              PORT: String(SECURITY_API_PORT),
+              MONGO_URI: SECURITY_MONGO_URI,
+              JWT_SECRET,
+              JWT_ACCESS_TTL: `${ACCESS_TOKEN_TTL_SECONDS}s`,
+              CORS_ORIGINS: WEB_URL,
+              APP_URL: WEB_URL,
+              MAIL_OUTBOX_FILE: `${TMP_DIR}/outbox-security.jsonl`,
+              SMTP_USER: '',
+              SMTP_PASS: '',
+              ...phase1BackendEnv,
+              PUSH_OUTBOX_FILE: `${TMP_DIR}/push-outbox-security.jsonl`,
+              PUBLIC_API_URL: SECURITY_API_URL,
+              RATE_LIMIT_ENABLED: 'true',
+              RATE_LIMIT_AUTH_MAX: String(RATE_LIMIT_AUTH_MAX),
+              VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
+              VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
+              VAPID_SUBJECT: 'mailto:security-tests@campuslink.test',
+            },
+          },
+        ]
+      : []),
     ...(needsWeb
       ? [
           {

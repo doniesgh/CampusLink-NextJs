@@ -1,5 +1,6 @@
 // Throwaway MongoDB for the test run (started by playwright.config.ts, first webServer).
-// It also resets tests/.tmp, so every run starts with an empty database and an empty mail outbox.
+// It also resets tests/.tmp, so every run starts with an empty database, empty mail/push outboxes
+// and no uploaded files.
 // Usage: node scripts/test-db.mjs [port]   (default 27018)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,12 +10,14 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tmpDir = path.resolve(here, '..', '.tmp');
 const dbPath = path.join(tmpDir, 'mongodb');
-const outboxFile = path.join(tmpDir, 'outbox.jsonl');
 const port = Number(process.argv[2]) || 27018;
 
 fs.rmSync(dbPath, { recursive: true, force: true });
 fs.mkdirSync(dbPath, { recursive: true });
-fs.rmSync(outboxFile, { force: true });
+const generated = ['outbox.jsonl', 'outbox-security.jsonl', 'push-outbox.jsonl', 'push-outbox-security.jsonl', 'uploads', 'security-answers.jsonl'];
+for (const name of generated) {
+  fs.rmSync(path.join(tmpDir, name), { recursive: true, force: true });
+}
 
 const mongod = await MongoMemoryServer.create({
   instance: {
