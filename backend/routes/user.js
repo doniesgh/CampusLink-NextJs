@@ -1,33 +1,32 @@
-const express = require('express')
-const router = express.Router()
-const passport = require('passport')
-const userController = require('../controllers/userController')
-const { verifyOTP, loginWithOTP, loginUserMob, updateUserByemail, signupUser, loginUser, updateProfil, getUsersByEmail, getUserById, getUsers, createUser, deleteUser, updateUser } = require('../controllers/userController')
-//login route
+const express = require('express');
+const {
+  getMe,
+  updateMe,
+  listUsers,
+  getUserStats,
+  createUser,
+  getUser,
+  updateUser,
+  deleteUser,
+} = require('../controllers/userController');
+const { requireAuth, requireRole } = require('../middleware/requireAuth');
 
-router.post('/login', loginUser)
-router.post('/loginotp', loginWithOTP)
-router.post('/verify-otp', verifyOTP);
-router.post('/loginMob', loginUserMob)
-//signup route
+const router = express.Router();
 
-router.post('/signup', signupUser)
-//get users
-router.get('/list', getUsers)
-//get usersby email
-router.get('/email/:email', getUsersByEmail)
-router.patch('/email/:email', updateUserByemail)
-//get usersby id
-router.get('/id/:id', getUserById)
-// POST user
-router.post('/add', createUser)
-// DELETE user
-router.delete('/:id', deleteUser)
-// UPDATE user
-router.patch('/:id', updateUser)
-//UPDATE Profil
-router.patch('/:id', updateProfil)
-//client number
-router.get('/profile/:userId', userController.getUserById);
-router.get('/role/:role', userController.getUserByRole);
-module.exports = router 
+// Mounted at /api/users. Every route needs a valid access token.
+router.use(requireAuth);
+
+// Current user (any role). Declared before /:id so "me" is not read as an id.
+router.get('/me', getMe);
+router.patch('/me', updateMe);
+
+// Administration
+const adminOnly = requireRole('ADMIN');
+router.get('/', adminOnly, listUsers);
+router.get('/stats', adminOnly, getUserStats);
+router.post('/', adminOnly, createUser);
+router.get('/:id', adminOnly, getUser);
+router.patch('/:id', adminOnly, updateUser);
+router.delete('/:id', adminOnly, deleteUser);
+
+module.exports = router;
