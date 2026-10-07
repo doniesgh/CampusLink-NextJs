@@ -1,0 +1,226 @@
+{
+  "metaTitle": "Timetable",
+  "title": "Timetable",
+  "subtitle": "Your classes, rooms and last-minute changes, even offline.",
+  "managementTitle": "Timetable management",
+  "managementSubtitle": "Plan the classes of every group, teacher and room.",
+  "loadError": "We couldn't load your timetable.",
+  "views": {
+    "label": "View",
+    "day": "Day",
+    "week": "Week",
+    "month": "Month"
+  },
+  "nav": {
+    "label": "Change period",
+    "previous": "Previous",
+    "next": "Next",
+    "today": "Today"
+  },
+  "period": {
+    "week": "{from} – {to}"
+  },
+  "filters": {
+    "label": "Filters",
+    "subject": "Subject",
+    "teacher": "Teacher",
+    "allSubjects": "All subjects",
+    "allTeachers": "All teachers",
+    "selected": "Selected"
+  },
+  "session": {
+    "room": "Room",
+    "teacher": "Teacher",
+    "groups": "Groups",
+    "notes": "Notes",
+    "noRoom": "Room to be confirmed",
+    "cancelled": "Cancelled",
+    "movedFrom": "Moved from {room}",
+    "rescheduled": "Rescheduled, was {time}",
+    "inProgress": "In progress",
+    "unknownSubject": "Class",
+    "types": {
+      "LECTURE": "Lecture",
+      "TUTORIAL": "Tutorial",
+      "LAB": "Lab",
+      "EXAM": "Exam",
+      "OTHER": "Other"
+    }
+  },
+  "empty": "No classes in this period.",
+  "emptyHint": "Enjoy the free time, or look at another period.",
+  "emptyFiltered": "No class matches these filters here.",
+  "freeDay": "Free",
+  "noGroup": {
+    "title": "You're not assigned to a group yet.",
+    "description": "Your school administration will add you to your group soon. Your timetable will show up here."
+  },
+  "adminInfo": {
+    "title": "Admins don't have a personal timetable.",
+    "description": "Plan the classes of the groups, teachers and rooms in Timetable management.",
+    "link": "Open timetable management"
+  },
+  "offline": {
+    "notSaved": "This period isn't saved on this device yet.",
+    "notSavedHint": "Reconnect to load it. Every period you open online stays available offline.",
+    "savedCopy": "Saved copy from {time}."
+  },
+  "month": {
+    "gridLabel": "Days of {month}",
+    "dayLabel": "{date}: {count, plural, =0 {no classes} one {# class} other {# classes}}",
+    "more": "+{count} more",
+    "emptyDay": "No classes on this day."
+  },
+  "export": {
+    "button": "Export",
+    "copyLink": "Copy calendar link",
+    "download": "Download .ics",
+    "google": "Add to Google Calendar",
+    "copied": "Calendar link copied. Paste it into your calendar app to subscribe.",
+    "copyManually": "Copy this link into your calendar app to subscribe.",
+    "linkLabel": "Calendar link",
+    "linkHint": "Anyone with this link can see your timetable. Reset it if you shared it by mistake.",
+    "reset": "Reset link",
+    "resetTitle": "Reset your calendar link?",
+    "resetDescription": "The old link stops working: calendar apps that use it must subscribe again with the new one.",
+    "resetDone": "Your calendar link has been reset. The old link no longer works.",
+    "hide": "Hide link"
+  },
+  "widget": {
+    "title": "Today's classes",
+    "empty": "No classes today. Enjoy your day!",
+    "next": "Next class: {when}",
+    "viewAll": "See my timetable",
+    "error": "We couldn't load your classes.",
+    "noGroup": "You're not assigned to a group yet.",
+    "adminText": "Plan the classes of every group, teacher and room.",
+    "adminLink": "Open timetable management",
+    "alumniText": "No classes on your side anymore. Enjoy your alumni life!"
+  },
+  "manage": {
+    "tabsLabel": "Show by",
+    "tabs": {
+      "group": "Group",
+      "teacher": "Teacher",
+      "room": "Room"
+    },
+    "showFor": "Show timetable for",
+    "noTargets": {
+      "group": "No groups yet. Create one in Academic structure first.",
+      "teacher": "No teacher accounts yet. Add one in Users first.",
+      "room": "No rooms yet. Create one in Academic structure first."
+    },
+    "add": "Add session",
+    "import": "Import CSV",
+    "loading": "Loading the week…",
+    "form": {
+      "addTitle": "Add a session",
+      "editTitle": "Edit session",
+      "addDescription": "Times are in the campus timezone. Conflicts are checked when you save.",
+      "subject": "Subject",
+      "teacher": "Teacher",
+      "groups": "Groups",
+      "groupsHint": "Hold Ctrl (Cmd on a Mac) to select several groups.",
+      "room": "Room",
+      "noRoom": "No room",
+      "date": "Date",
+      "start": "Start time",
+      "end": "End time",
+      "type": "Type",
+      "notes": "Notes",
+      "repeat": "Repeat weekly",
+      "repeatHint": "Same weekday and times every week.",
+      "until": "Until",
+      "untilHint": "Last date of the series, up to 26 weeks.",
+      "chooseSubject": "Choose a subject",
+      "chooseTeacher": "Choose a teacher",
+      "save": "Save session",
+      "saveChanges": "Save changes",
+      "cancelSession": "Cancel session",
+      "restoreSession": "Restore session",
+      "delete": "Delete",
+      "scope": "Apply to",
+      "scopeOccurrence": "This session only",
+      "scopeSeries": "This and following sessions",
+      "seriesInfo": "This session is part of a weekly series.",
+      "cancelledInfo": "This session is cancelled.",
+      "endBeforeStart": "The end time must be after the start time.",
+      "untilBeforeDate": "Pick a date after the first session.",
+      "nothingChanged": "There's nothing to save."
+    },
+    "confirmCancel": {
+      "title": "Cancel this session?",
+      "description": "Students and the teacher are notified when it's in the next two weeks.",
+      "seriesDescription": "This session and the following ones of the series will be cancelled. Students and the teacher are notified for those in the next two weeks.",
+      "confirm": "Confirm cancellation",
+      "keep": "Keep session"
+    },
+    "confirmDelete": {
+      "title": "Delete this session?",
+      "description": "Only for mistakes: nobody is notified. To call off a class, cancel it instead.",
+      "seriesDescription": "This session and the following ones of the series will be deleted. Nobody is notified.",
+      "confirm": "Confirm delete"
+    },
+    "conflict": {
+      "title": "Conflict: this time slot is already taken.",
+      "hint": "Change the time, the room, the teacher or the groups, then save again.",
+      "item": "{reason}: {subject}, {when}",
+      "reasons": {
+        "ROOM": "Same room",
+        "TEACHER": "Same teacher",
+        "GROUP": "Same group"
+      }
+    },
+    "saved": "Session saved.",
+    "savedSeries": "{count, plural, one {# session saved.} other {# sessions saved.}}",
+    "updated": "{count, plural, one {Changes saved.} other {Changes saved on # sessions.}}",
+    "cancelled": "{count, plural, one {Session cancelled.} other {# sessions cancelled.}}",
+    "restored": "{count, plural, one {Session restored.} other {# sessions restored.}}",
+    "deleted": "Session deleted.",
+    "importDialog": {
+      "title": "Import sessions from a CSV file",
+      "description": "One session per line. Columns: date (YYYY-MM-DD), start and end (HH:mm), subject_code, teacher_email, groups (names separated by |), and optionally room, type and notes.",
+      "example": "Example",
+      "file": "CSV file",
+      "fileHint": "UTF-8, comma or semicolon separated, up to 2 MB and 2,000 rows. Nothing is imported if a line has a problem.",
+      "chooseFile": "Choose a CSV file.",
+      "check": "Check file",
+      "import": "Import",
+      "checkOk": "{rows, plural, one {# row checked: no problems found.} other {# rows checked: no problems found.}} You can import the file.",
+      "imported": "{created, plural, one {# session imported.} other {# sessions imported.}}",
+      "invalid": "The file has problems, so nothing was imported.",
+      "invalidCheck": "The file has problems. Fix them and check it again.",
+      "reportTitle": "Report",
+      "rows": "{rows, plural, one {# row in the file} other {# rows in the file}}",
+      "line": "Line",
+      "problem": "Problem",
+      "wholeFile": "File",
+      "conflictWith": "Conflicts with {subject} on {when} ({reason}).",
+      "conflictWithLine": "Conflicts with line {line} ({reason}).",
+      "truncated": "Only the first problems are listed.",
+      "errorCodes": {
+        "CSV_PARSE_ERROR": "This line can't be read as CSV.",
+        "EMPTY_FILE": "The file has no session rows.",
+        "MISSING_COLUMNS": "Some required columns are missing.",
+        "UNKNOWN_COLUMNS": "Some columns are unknown.",
+        "DUPLICATE_COLUMNS": "A column appears twice.",
+        "TOO_MANY_ROWS": "The file has too many rows.",
+        "INVALID_ENCODING": "The file must be encoded in UTF-8.",
+        "TOO_MANY_VALUES": "This line has too many values.",
+        "MISSING_VALUE": "A required value is missing.",
+        "INVALID_DATE": "The date isn't valid (YYYY-MM-DD).",
+        "INVALID_TIME": "A time isn't valid (HH:mm).",
+        "INVALID_TIME_RANGE": "The times aren't valid (same day, end after start, 8 hours at most).",
+        "UNKNOWN_SUBJECT": "Unknown subject code.",
+        "UNKNOWN_TEACHER": "No account with this email.",
+        "NOT_A_TEACHER": "This account isn't a teacher.",
+        "TOO_MANY_GROUPS": "Too many groups on this line.",
+        "UNKNOWN_GROUP": "Unknown group.",
+        "UNKNOWN_ROOM": "Unknown room.",
+        "INVALID_TYPE": "Unknown session type.",
+        "NOTES_TOO_LONG": "The notes are too long."
+      },
+      "column": "column {column}"
+    }
+  }
+}

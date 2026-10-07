@@ -1,0 +1,226 @@
+{
+  "metaTitle": "Emploi du temps",
+  "title": "Emploi du temps",
+  "subtitle": "Tes cours, tes salles et les changements de dernière minute, même hors ligne.",
+  "managementTitle": "Gestion de l'emploi du temps",
+  "managementSubtitle": "Planifie les cours de chaque groupe, enseignant et salle.",
+  "loadError": "On n'a pas pu charger ton emploi du temps.",
+  "views": {
+    "label": "Affichage",
+    "day": "Jour",
+    "week": "Semaine",
+    "month": "Mois"
+  },
+  "nav": {
+    "label": "Changer de période",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "today": "Aujourd'hui"
+  },
+  "period": {
+    "week": "{from} – {to}"
+  },
+  "filters": {
+    "label": "Filtres",
+    "subject": "Matière",
+    "teacher": "Enseignant",
+    "allSubjects": "Toutes les matières",
+    "allTeachers": "Tous les enseignants",
+    "selected": "Sélection"
+  },
+  "session": {
+    "room": "Salle",
+    "teacher": "Enseignant",
+    "groups": "Groupes",
+    "notes": "Notes",
+    "noRoom": "Salle à confirmer",
+    "cancelled": "Annulé",
+    "movedFrom": "Déplacé depuis {room}",
+    "rescheduled": "Horaire modifié, avant {time}",
+    "inProgress": "En cours",
+    "unknownSubject": "Cours",
+    "types": {
+      "LECTURE": "Cours",
+      "TUTORIAL": "TD",
+      "LAB": "TP",
+      "EXAM": "Examen",
+      "OTHER": "Autre"
+    }
+  },
+  "empty": "Aucun cours sur cette période.",
+  "emptyHint": "Profite de ce temps libre, ou regarde une autre période.",
+  "emptyFiltered": "Aucun cours ne correspond à ces filtres ici.",
+  "freeDay": "Libre",
+  "noGroup": {
+    "title": "Tu n'es pas encore inscrit dans un groupe.",
+    "description": "L'administration va bientôt t'ajouter à ton groupe. Ton emploi du temps s'affichera ici."
+  },
+  "adminInfo": {
+    "title": "Les admins n'ont pas d'emploi du temps personnel.",
+    "description": "Planifie les cours des groupes, des enseignants et des salles dans la gestion de l'emploi du temps.",
+    "link": "Ouvrir la gestion de l'emploi du temps"
+  },
+  "offline": {
+    "notSaved": "Cette période n'est pas encore enregistrée sur cet appareil.",
+    "notSavedHint": "Reconnecte-toi pour la charger. Chaque période que tu ouvres en ligne reste disponible hors ligne.",
+    "savedCopy": "Copie enregistrée le {time}."
+  },
+  "month": {
+    "gridLabel": "Jours de {month}",
+    "dayLabel": "{date} : {count, plural, =0 {aucun cours} one {# cours} other {# cours}}",
+    "more": "+{count} autres",
+    "emptyDay": "Aucun cours ce jour-là."
+  },
+  "export": {
+    "button": "Exporter",
+    "copyLink": "Copier le lien du calendrier",
+    "download": "Télécharger le .ics",
+    "google": "Ajouter à Google Agenda",
+    "copied": "Lien du calendrier copié. Colle-le dans ton appli de calendrier pour t'abonner.",
+    "copyManually": "Copie ce lien dans ton appli de calendrier pour t'abonner.",
+    "linkLabel": "Lien du calendrier",
+    "linkHint": "Toute personne qui a ce lien peut voir ton emploi du temps. Réinitialise-le si tu l'as partagé par erreur.",
+    "reset": "Réinitialiser le lien",
+    "resetTitle": "Réinitialiser ton lien de calendrier ?",
+    "resetDescription": "L'ancien lien ne marchera plus : les applis de calendrier qui l'utilisent devront s'abonner avec le nouveau.",
+    "resetDone": "Ton lien de calendrier a été réinitialisé. L'ancien lien ne marche plus.",
+    "hide": "Masquer le lien"
+  },
+  "widget": {
+    "title": "Tes cours du jour",
+    "empty": "Pas de cours aujourd'hui. Profite bien de ta journée !",
+    "next": "Prochain cours : {when}",
+    "viewAll": "Voir mon emploi du temps",
+    "error": "On n'a pas pu charger tes cours.",
+    "noGroup": "Tu n'es pas encore inscrit dans un groupe.",
+    "adminText": "Planifie les cours de chaque groupe, enseignant et salle.",
+    "adminLink": "Ouvrir la gestion de l'emploi du temps",
+    "alumniText": "Plus de cours de ton côté. Profite bien de ta vie d'alumni !"
+  },
+  "manage": {
+    "tabsLabel": "Afficher par",
+    "tabs": {
+      "group": "Groupe",
+      "teacher": "Enseignant",
+      "room": "Salle"
+    },
+    "showFor": "Afficher l'emploi du temps de",
+    "noTargets": {
+      "group": "Aucun groupe pour l'instant. Crée-en un dans la structure académique.",
+      "teacher": "Aucun compte enseignant pour l'instant. Ajoute-en un dans Utilisateurs.",
+      "room": "Aucune salle pour l'instant. Crée-en une dans la structure académique."
+    },
+    "add": "Ajouter une séance",
+    "import": "Importer un CSV",
+    "loading": "Chargement de la semaine…",
+    "form": {
+      "addTitle": "Ajouter une séance",
+      "editTitle": "Modifier la séance",
+      "addDescription": "Les heures sont celles du campus. Les conflits sont vérifiés à l'enregistrement.",
+      "subject": "Matière",
+      "teacher": "Enseignant",
+      "groups": "Groupes",
+      "groupsHint": "Maintiens Ctrl (Cmd sur Mac) pour choisir plusieurs groupes.",
+      "room": "Salle",
+      "noRoom": "Sans salle",
+      "date": "Date",
+      "start": "Heure de début",
+      "end": "Heure de fin",
+      "type": "Type",
+      "notes": "Notes",
+      "repeat": "Répéter chaque semaine",
+      "repeatHint": "Même jour et mêmes heures chaque semaine.",
+      "until": "Jusqu'au",
+      "untilHint": "Dernière date de la série, 26 semaines au maximum.",
+      "chooseSubject": "Choisis une matière",
+      "chooseTeacher": "Choisis un enseignant",
+      "save": "Enregistrer la séance",
+      "saveChanges": "Enregistrer les modifications",
+      "cancelSession": "Annuler la séance",
+      "restoreSession": "Rétablir la séance",
+      "delete": "Supprimer",
+      "scope": "Appliquer à",
+      "scopeOccurrence": "Cette séance uniquement",
+      "scopeSeries": "Cette séance et les suivantes",
+      "seriesInfo": "Cette séance fait partie d'une série hebdomadaire.",
+      "cancelledInfo": "Cette séance est annulée.",
+      "endBeforeStart": "L'heure de fin doit être après l'heure de début.",
+      "untilBeforeDate": "Choisis une date après la première séance.",
+      "nothingChanged": "Il n'y a rien à enregistrer."
+    },
+    "confirmCancel": {
+      "title": "Annuler cette séance ?",
+      "description": "Les étudiants et l'enseignant sont prévenus si elle a lieu dans les deux prochaines semaines.",
+      "seriesDescription": "Cette séance et les suivantes de la série seront annulées. Les étudiants et l'enseignant sont prévenus pour celles des deux prochaines semaines.",
+      "confirm": "Confirmer l'annulation",
+      "keep": "Garder la séance"
+    },
+    "confirmDelete": {
+      "title": "Supprimer cette séance ?",
+      "description": "Seulement en cas d'erreur : personne n'est prévenu. Pour annuler un cours, utilise plutôt « Annuler la séance ».",
+      "seriesDescription": "Cette séance et les suivantes de la série seront supprimées. Personne n'est prévenu.",
+      "confirm": "Confirmer la suppression"
+    },
+    "conflict": {
+      "title": "Conflit : ce créneau est déjà pris.",
+      "hint": "Change l'horaire, la salle, l'enseignant ou les groupes, puis enregistre à nouveau.",
+      "item": "{reason} : {subject}, {when}",
+      "reasons": {
+        "ROOM": "Même salle",
+        "TEACHER": "Même enseignant",
+        "GROUP": "Même groupe"
+      }
+    },
+    "saved": "Séance enregistrée.",
+    "savedSeries": "{count, plural, one {# séance enregistrée.} other {# séances enregistrées.}}",
+    "updated": "{count, plural, one {Modifications enregistrées.} other {Modifications enregistrées sur # séances.}}",
+    "cancelled": "{count, plural, one {Séance annulée.} other {# séances annulées.}}",
+    "restored": "{count, plural, one {Séance rétablie.} other {# séances rétablies.}}",
+    "deleted": "Séance supprimée.",
+    "importDialog": {
+      "title": "Importer des séances depuis un fichier CSV",
+      "description": "Une séance par ligne. Colonnes : date (AAAA-MM-JJ), start et end (HH:mm), subject_code, teacher_email, groups (noms séparés par |), et en option room, type et notes.",
+      "example": "Exemple",
+      "file": "Fichier CSV",
+      "fileHint": "UTF-8, séparateur virgule ou point-virgule, 2 Mo et 2 000 lignes au maximum. Rien n'est importé si une ligne pose problème.",
+      "chooseFile": "Choisis un fichier CSV.",
+      "check": "Vérifier le fichier",
+      "import": "Importer",
+      "checkOk": "{rows, plural, one {# ligne vérifiée : aucun problème.} other {# lignes vérifiées : aucun problème.}} Tu peux importer le fichier.",
+      "imported": "{created, plural, one {# séance importée.} other {# séances importées.}}",
+      "invalid": "Le fichier a des problèmes, donc rien n'a été importé.",
+      "invalidCheck": "Le fichier a des problèmes. Corrige-les puis vérifie-le à nouveau.",
+      "reportTitle": "Rapport",
+      "rows": "{rows, plural, one {# ligne dans le fichier} other {# lignes dans le fichier}}",
+      "line": "Ligne",
+      "problem": "Problème",
+      "wholeFile": "Fichier",
+      "conflictWith": "En conflit avec {subject} le {when} ({reason}).",
+      "conflictWithLine": "En conflit avec la ligne {line} ({reason}).",
+      "truncated": "Seuls les premiers problèmes sont listés.",
+      "errorCodes": {
+        "CSV_PARSE_ERROR": "Cette ligne ne peut pas être lue comme du CSV.",
+        "EMPTY_FILE": "Le fichier ne contient aucune séance.",
+        "MISSING_COLUMNS": "Des colonnes obligatoires manquent.",
+        "UNKNOWN_COLUMNS": "Certaines colonnes sont inconnues.",
+        "DUPLICATE_COLUMNS": "Une colonne apparaît deux fois.",
+        "TOO_MANY_ROWS": "Le fichier a trop de lignes.",
+        "INVALID_ENCODING": "Le fichier doit être encodé en UTF-8.",
+        "TOO_MANY_VALUES": "Cette ligne a trop de valeurs.",
+        "MISSING_VALUE": "Une valeur obligatoire manque.",
+        "INVALID_DATE": "La date n'est pas valide (AAAA-MM-JJ).",
+        "INVALID_TIME": "Une heure n'est pas valide (HH:mm).",
+        "INVALID_TIME_RANGE": "Les horaires ne sont pas valides (même jour, fin après le début, 8 heures au maximum).",
+        "UNKNOWN_SUBJECT": "Code de matière inconnu.",
+        "UNKNOWN_TEACHER": "Aucun compte avec cet e-mail.",
+        "NOT_A_TEACHER": "Ce compte n'est pas un enseignant.",
+        "TOO_MANY_GROUPS": "Trop de groupes sur cette ligne.",
+        "UNKNOWN_GROUP": "Groupe inconnu.",
+        "UNKNOWN_ROOM": "Salle inconnue.",
+        "INVALID_TYPE": "Type de séance inconnu.",
+        "NOTES_TOO_LONG": "Les notes sont trop longues."
+      },
+      "column": "colonne {column}"
+    }
+  }
+}
