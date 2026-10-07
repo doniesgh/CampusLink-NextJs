@@ -45,6 +45,8 @@ next-env.d.ts
 backend/node_modules/
 backend/.env
 backend/.env.*
+!backend/.env.example
+backend/logs/
 
 # Frontend
 next/node_modules/
