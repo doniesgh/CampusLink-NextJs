@@ -1,0 +1,219 @@
+{
+  "metaTitle": "Announcements",
+  "detailTitle": "Announcement",
+  "managementTitle": "Announcements management",
+  "unknownAuthor": "CampusLink",
+  "priority": {
+    "URGENT": "Urgent",
+    "HIGH": "High",
+    "NORMAL": "Normal",
+    "LOW": "Low"
+  },
+  "status": {
+    "DRAFT": "Draft",
+    "SCHEDULED": "Scheduled",
+    "PUBLISHED": "Published"
+  },
+  "attachments": {
+    "offline": "Downloading a file needs a connection. Reconnect to open the attachments."
+  },
+  "audience": {
+    "everyone": "Everyone",
+    "summaryLabel": "Audience",
+    "levelLabel": "Level {level}"
+  },
+  "feed": {
+    "title": "Announcements",
+    "subtitle": "News from your school and your teachers, newest first.",
+    "unreadOnly": "Unread only",
+    "unreadSummary": "{count, plural, =0 {No unread announcements.} one {# unread announcement} other {# unread announcements}}",
+    "files": "{count, plural, one {# file} other {# files}}",
+    "empty": "No announcements yet.",
+    "emptyText": "When your school or your teachers post something for you, you'll find it here.",
+    "allCaughtUp": "You're all caught up.",
+    "noUnread": "You've read every announcement. Untick \"Unread only\" to see them all.",
+    "notSavedTitle": "This list isn't saved on this device yet.",
+    "notSavedText": "Open it once while you're online, and you'll be able to read it offline.",
+    "loadError": "We couldn't load the announcements.",
+    "pageError": "We couldn't load more announcements. Try again when you're back online."
+  },
+  "offlineReader": {
+    "savedCopy": "You're offline: this is the copy saved on this device.",
+    "byline": "By {author} · {date}"
+  },
+  "notFound": {
+    "title": "We couldn't find this announcement.",
+    "text": "It may have been deleted, or it isn't meant for you."
+  },
+  "detail": {
+    "back": "All announcements",
+    "loadingTitle": "Announcement",
+    "by": "By {author}",
+    "publishedOn": "Published",
+    "scheduledFor": "Scheduled for",
+    "editedOn": "Draft, last edited",
+    "attachments": "{count, plural, one {Attachment} other {Attachments}}",
+    "managerReads": "Read by {reads} of {recipients} recipients ({rate}).",
+    "managerNotPublished": "Not published yet: only you and the admins can see it.",
+    "viewStats": "View statistics",
+    "notSavedTitle": "This announcement isn't saved on this device yet.",
+    "notSavedText": "Open it once while you're online, and you'll be able to read it offline.",
+    "loadError": "We couldn't load this announcement."
+  },
+  "widget": {
+    "title": "Latest announcements",
+    "unread": "{count, plural, one {# new} other {# new}}",
+    "empty": "No announcements for now.",
+    "error": "We couldn't load the announcements.",
+    "viewAll": "See all announcements",
+    "write": "Write an announcement"
+  },
+  "form": {
+    "newTitle": "New announcement",
+    "newSubtitleAdmin": "Write it once, choose who receives it, and we'll notify them.",
+    "newSubtitleTeacher": "Write to the students of the groups you teach. They'll get a notification.",
+    "editTitle": "Edit announcement",
+    "editSubtitle": "Change anything before it goes out.",
+    "editPublishedSubtitle": "It's already published: you can still fix the title, the message and the priority. Nobody gets a new notification.",
+    "title": "Title",
+    "titleHint": "{count}/{max} characters",
+    "message": "Message",
+    "messageHint": "Plain text: line breaks are kept and web addresses become links.",
+    "priority": "Priority",
+    "priorityHint": "Urgent and High announcements are highlighted in notifications.",
+    "audience": "Audience",
+    "audienceHint": "Tick nothing to send it to everyone. Each criterion narrows the audience.",
+    "audienceHintTeacher": "Choose at least one of the groups you teach. Only their students will receive it.",
+    "audienceLocked": "The audience can't change once the announcement is published.",
+    "roles": "Roles",
+    "programs": "Programs",
+    "levels": "Levels",
+    "groups": "Groups",
+    "noOptions": "Nothing to choose from yet.",
+    "noGroups": "No groups yet.",
+    "recipients": "{count, plural, one {# recipient} other {# recipients}}",
+    "previewLoading": "Counting recipients…",
+    "previewError": "We can't count the recipients right now.",
+    "previewOffline": "Recipients are counted when you're online.",
+    "previewHints": {
+      "GROUPS_REQUIRED": "Pick at least one of your groups to see who will receive it.",
+      "ROLES_NOT_ALLOWED": "You can only write to students.",
+      "GROUP_NOT_TAUGHT": "You can only write to the groups you teach."
+    },
+    "everyoneNote": "Nothing ticked: everyone receives it.",
+    "attachmentsSection": "Files",
+    "attachments": "Attachments",
+    "attachmentsHint": "Up to {max} files of {size} MB each: PDF, images, Word, Excel, PowerPoint or text.",
+    "attachmentsLocked": "Files can't change once the announcement is published.",
+    "newFiles": "Files to add",
+    "removeFile": "Remove {name}",
+    "publication": "Publication",
+    "publishLater": "Publish later",
+    "publishLaterHint": "We'll publish it at the chosen time and notify everyone then.",
+    "publishAt": "Publish at",
+    "publishAtHint": "Campus time ({timezone}), at least a minute from now.",
+    "saveDraft": "Save draft",
+    "publishNow": "Publish now",
+    "schedule": "Schedule",
+    "saveChanges": "Save changes",
+    "offline": "You're offline. Your announcement can be sent once you're back online.",
+    "noTaughtGroups": "You don't teach any group yet, so you can't write an announcement. Once your classes are in the timetable, come back here.",
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "titleRequired": "Give your announcement a title.",
+      "titleTooLong": "The title can't be longer than {max} characters.",
+      "bodyRequired": "Write a message.",
+      "bodyTooLong": "The message can't be longer than {max} characters.",
+      "publishAtRequired": "Choose when to publish it.",
+      "publishAtPast": "Choose a time at least a minute from now.",
+      "tooManyFiles": "You can attach up to {max} files.",
+      "fileTooLarge": "Each file must be {max} MB or less.",
+      "fileTooLargeNamed": "\"{name}\" is larger than {max} MB.",
+      "fileType": "\"{name}\" isn't a supported file type.",
+      "fileTypeGeneric": "This file type isn't supported.",
+      "changedMeanwhile": "This announcement changed in the meantime (it may have just been published). Reload the page and try again.",
+      "audience": {
+        "GROUPS_REQUIRED": "Choose at least one of the groups you teach.",
+        "ROLES_NOT_ALLOWED": "You can only write to students.",
+        "GROUP_NOT_TAUGHT": "You can only write to the groups you teach."
+      }
+    }
+  },
+  "manage": {
+    "subtitleAdmin": "Every announcement, with how many people received and read it.",
+    "subtitleTeacher": "Your announcements, with how many students received and read them.",
+    "new": "New announcement",
+    "backToList": "Back to the list",
+    "backToAnnouncement": "Back to the announcement",
+    "filters": {
+      "label": "Filter by status",
+      "all": "All",
+      "DRAFT": "Drafts",
+      "SCHEDULED": "Scheduled",
+      "PUBLISHED": "Published"
+    },
+    "columns": {
+      "title": "Title",
+      "status": "Status",
+      "recipients": "Recipients",
+      "readRate": "Read rate",
+      "actions": "Actions"
+    },
+    "when": {
+      "DRAFT": "Edited {date}",
+      "SCHEDULED": "For {date}",
+      "PUBLISHED": "On {date}"
+    },
+    "byAuthor": "by {author}",
+    "files": "{count, plural, one {# file} other {# files}}",
+    "notPublishedYet": "Not published yet",
+    "empty": "No announcements yet.",
+    "emptyFiltered": "No announcements with this status.",
+    "emptyText": "Write your first one with \"New announcement\": you choose who receives it.",
+    "publishNow": "Publish now",
+    "confirmPublishTitle": "Publish \"{title}\" now?",
+    "confirmPublishDescription": "{count, plural, =0 {Nobody matches its audience yet.} one {# person will be notified.} other {# people will be notified.}}",
+    "confirmDeleteTitle": "Delete \"{title}\"?",
+    "confirmDeleteDescription": "Its files, reads and notifications are deleted too. This can't be undone.",
+    "alreadyPublished": "This announcement is already published.",
+    "done": {
+      "draft": "Draft saved.",
+      "published": "Announcement published. {count, plural, =0 {Nobody matched its audience.} one {# recipient is being notified.} other {# recipients are being notified.}}",
+      "scheduled": "Announcement scheduled. It will go out at the chosen time.",
+      "updated": "Changes saved.",
+      "deleted": "Announcement deleted."
+    }
+  },
+  "stats": {
+    "metaTitle": "Announcement statistics",
+    "metaTitleWith": "{title} · Statistics",
+    "byline": "By {author}",
+    "publishedOn": "published {date}",
+    "scheduledFor": "scheduled for {date}",
+    "draftEdited": "draft, last edited {date}",
+    "openInFeed": "Open in the feed",
+    "title": "Statistics",
+    "notPublished": "Not published yet: reads start counting once it's published. Recipients is how many people it would reach now.",
+    "recipients": "Recipients",
+    "reads": "Reads",
+    "readRate": "Read rate",
+    "readRateText": "{reads} of {recipients} recipients",
+    "notPublishedShort": "Not published yet",
+    "audience": "Audience",
+    "message": "Message",
+    "chart": {
+      "title": "Reads by day",
+      "description": "How many recipients opened it each day (campus time).",
+      "unavailable": "The daily reads can't be loaded right now.",
+      "empty": "No reads yet.",
+      "summary": "Reads by day: {total, plural, one {# read} other {# reads}} over {days, plural, one {# day} other {# days}}, most on {peakDate} ({peak}).",
+      "summaryNone": "Reads by day: no reads yet over {days, plural, one {# day} other {# days}}.",
+      "lastDays": "Last {days} days",
+      "reads": "{count, plural, one {# read} other {# reads}}",
+      "showTable": "Show as a table",
+      "tableCaption": "Reads by day",
+      "date": "Date",
+      "count": "Reads"
+    }
+  }
+}

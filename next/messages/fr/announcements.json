@@ -1,0 +1,219 @@
+{
+  "metaTitle": "Annonces",
+  "detailTitle": "Annonce",
+  "managementTitle": "Gestion des annonces",
+  "unknownAuthor": "CampusLink",
+  "priority": {
+    "URGENT": "Urgente",
+    "HIGH": "Importante",
+    "NORMAL": "Normale",
+    "LOW": "Faible"
+  },
+  "status": {
+    "DRAFT": "Brouillon",
+    "SCHEDULED": "Programmée",
+    "PUBLISHED": "Publiée"
+  },
+  "attachments": {
+    "offline": "Pour télécharger un fichier, il te faut une connexion. Reconnecte-toi pour ouvrir les pièces jointes."
+  },
+  "audience": {
+    "everyone": "Tout le monde",
+    "summaryLabel": "Destinataires",
+    "levelLabel": "Niveau {level}"
+  },
+  "feed": {
+    "title": "Annonces",
+    "subtitle": "Les nouvelles de ton école et de tes profs, les plus récentes d'abord.",
+    "unreadOnly": "Non lues seulement",
+    "unreadSummary": "{count, plural, =0 {Aucune annonce non lue.} one {# annonce non lue} other {# annonces non lues}}",
+    "files": "{count, plural, one {# fichier} other {# fichiers}}",
+    "empty": "Pas encore d'annonce.",
+    "emptyText": "Quand ton école ou tes profs publieront quelque chose pour toi, tu le trouveras ici.",
+    "allCaughtUp": "Tu es à jour !",
+    "noUnread": "Tu as lu toutes les annonces. Décoche « Non lues seulement » pour les revoir.",
+    "notSavedTitle": "Cette liste n'est pas encore enregistrée sur cet appareil.",
+    "notSavedText": "Ouvre-la une fois en ligne, et tu pourras la lire même hors ligne.",
+    "loadError": "On n'a pas pu charger les annonces.",
+    "pageError": "On n'a pas pu charger plus d'annonces. Réessaie quand tu seras reconnecté."
+  },
+  "offlineReader": {
+    "savedCopy": "Tu es hors ligne : voici la copie enregistrée sur cet appareil.",
+    "byline": "Par {author} · {date}"
+  },
+  "notFound": {
+    "title": "On n'a pas trouvé cette annonce.",
+    "text": "Elle a peut-être été supprimée, ou elle ne t'est pas destinée."
+  },
+  "detail": {
+    "back": "Toutes les annonces",
+    "loadingTitle": "Annonce",
+    "by": "Par {author}",
+    "publishedOn": "Publiée le",
+    "scheduledFor": "Programmée pour le",
+    "editedOn": "Brouillon, modifié le",
+    "attachments": "{count, plural, one {Pièce jointe} other {Pièces jointes}}",
+    "managerReads": "Lue par {reads} destinataires sur {recipients} ({rate}).",
+    "managerNotPublished": "Pas encore publiée : seuls toi et les admins pouvez la voir.",
+    "viewStats": "Voir les statistiques",
+    "notSavedTitle": "Cette annonce n'est pas encore enregistrée sur cet appareil.",
+    "notSavedText": "Ouvre-la une fois en ligne, et tu pourras la lire même hors ligne.",
+    "loadError": "On n'a pas pu charger cette annonce."
+  },
+  "widget": {
+    "title": "Dernières annonces",
+    "unread": "{count, plural, one {# nouvelle} other {# nouvelles}}",
+    "empty": "Aucune annonce pour l'instant.",
+    "error": "On n'a pas pu charger les annonces.",
+    "viewAll": "Voir toutes les annonces",
+    "write": "Écrire une annonce"
+  },
+  "form": {
+    "newTitle": "Nouvelle annonce",
+    "newSubtitleAdmin": "Écris-la une fois, choisis qui la reçoit, et on s'occupe de prévenir tout le monde.",
+    "newSubtitleTeacher": "Écris aux étudiants des groupes où tu enseignes. Ils recevront une notification.",
+    "editTitle": "Modifier l'annonce",
+    "editSubtitle": "Tu peux tout changer avant qu'elle parte.",
+    "editPublishedSubtitle": "Elle est déjà publiée : tu peux encore corriger le titre, le message et la priorité. Personne ne recevra de nouvelle notification.",
+    "title": "Titre",
+    "titleHint": "{count}/{max} caractères",
+    "message": "Message",
+    "messageHint": "Texte simple : les retours à la ligne sont gardés et les adresses web deviennent des liens.",
+    "priority": "Priorité",
+    "priorityHint": "Les annonces urgentes et importantes sont mises en avant dans les notifications.",
+    "audience": "Destinataires",
+    "audienceHint": "Ne coche rien pour l'envoyer à tout le monde. Chaque critère réduit le public.",
+    "audienceHintTeacher": "Choisis au moins un des groupes où tu enseignes. Seuls leurs étudiants la recevront.",
+    "audienceLocked": "Les destinataires ne peuvent plus changer une fois l'annonce publiée.",
+    "roles": "Rôles",
+    "programs": "Filières",
+    "levels": "Niveaux",
+    "groups": "Groupes",
+    "noOptions": "Rien à choisir pour l'instant.",
+    "noGroups": "Pas encore de groupe.",
+    "recipients": "{count, plural, one {# destinataire} other {# destinataires}}",
+    "previewLoading": "On compte les destinataires…",
+    "previewError": "On n'arrive pas à compter les destinataires pour le moment.",
+    "previewOffline": "Les destinataires sont comptés quand tu es en ligne.",
+    "previewHints": {
+      "GROUPS_REQUIRED": "Choisis au moins un de tes groupes pour voir qui la recevra.",
+      "ROLES_NOT_ALLOWED": "Tu peux seulement écrire aux étudiants.",
+      "GROUP_NOT_TAUGHT": "Tu peux seulement écrire aux groupes où tu enseignes."
+    },
+    "everyoneNote": "Rien de coché : tout le monde la reçoit.",
+    "attachmentsSection": "Fichiers",
+    "attachments": "Pièces jointes",
+    "attachmentsHint": "Jusqu'à {max} fichiers de {size} Mo chacun : PDF, images, Word, Excel, PowerPoint ou texte.",
+    "attachmentsLocked": "Les fichiers ne peuvent plus changer une fois l'annonce publiée.",
+    "newFiles": "Fichiers à ajouter",
+    "removeFile": "Retirer {name}",
+    "publication": "Publication",
+    "publishLater": "Publier plus tard",
+    "publishLaterHint": "On la publiera à l'heure choisie et on préviendra tout le monde à ce moment-là.",
+    "publishAt": "Publier le",
+    "publishAtHint": "Heure du campus ({timezone}), au moins une minute à partir de maintenant.",
+    "saveDraft": "Enregistrer le brouillon",
+    "publishNow": "Publier maintenant",
+    "schedule": "Programmer",
+    "saveChanges": "Enregistrer les modifications",
+    "offline": "Tu es hors ligne. Ton annonce pourra partir dès que tu seras reconnecté.",
+    "noTaughtGroups": "Tu n'enseignes encore dans aucun groupe, donc tu ne peux pas écrire d'annonce. Reviens ici dès que tes cours seront dans l'emploi du temps.",
+    "errors": {
+      "generic": "Oups, quelque chose s'est mal passé. Réessaie.",
+      "titleRequired": "Donne un titre à ton annonce.",
+      "titleTooLong": "Le titre ne peut pas dépasser {max} caractères.",
+      "bodyRequired": "Écris un message.",
+      "bodyTooLong": "Le message ne peut pas dépasser {max} caractères.",
+      "publishAtRequired": "Choisis quand la publier.",
+      "publishAtPast": "Choisis une heure au moins une minute plus tard.",
+      "tooManyFiles": "Tu peux joindre {max} fichiers au maximum.",
+      "fileTooLarge": "Chaque fichier doit faire {max} Mo au maximum.",
+      "fileTooLargeNamed": "« {name} » dépasse {max} Mo.",
+      "fileType": "« {name} » n'est pas un type de fichier accepté.",
+      "fileTypeGeneric": "Ce type de fichier n'est pas accepté.",
+      "changedMeanwhile": "Cette annonce a changé entre-temps (elle vient peut-être d'être publiée). Recharge la page et réessaie.",
+      "audience": {
+        "GROUPS_REQUIRED": "Choisis au moins un des groupes où tu enseignes.",
+        "ROLES_NOT_ALLOWED": "Tu peux seulement écrire aux étudiants.",
+        "GROUP_NOT_TAUGHT": "Tu peux seulement écrire aux groupes où tu enseignes."
+      }
+    }
+  },
+  "manage": {
+    "subtitleAdmin": "Toutes les annonces, avec combien de personnes les ont reçues et lues.",
+    "subtitleTeacher": "Tes annonces, avec combien d'étudiants les ont reçues et lues.",
+    "new": "Nouvelle annonce",
+    "backToList": "Retour à la liste",
+    "backToAnnouncement": "Retour à l'annonce",
+    "filters": {
+      "label": "Filtrer par statut",
+      "all": "Toutes",
+      "DRAFT": "Brouillons",
+      "SCHEDULED": "Programmées",
+      "PUBLISHED": "Publiées"
+    },
+    "columns": {
+      "title": "Titre",
+      "status": "Statut",
+      "recipients": "Destinataires",
+      "readRate": "Taux de lecture",
+      "actions": "Actions"
+    },
+    "when": {
+      "DRAFT": "Modifié le {date}",
+      "SCHEDULED": "Pour le {date}",
+      "PUBLISHED": "Le {date}"
+    },
+    "byAuthor": "par {author}",
+    "files": "{count, plural, one {# fichier} other {# fichiers}}",
+    "notPublishedYet": "Pas encore publiée",
+    "empty": "Pas encore d'annonce.",
+    "emptyFiltered": "Aucune annonce avec ce statut.",
+    "emptyText": "Écris ta première annonce avec « Nouvelle annonce » : c'est toi qui choisis qui la reçoit.",
+    "publishNow": "Publier maintenant",
+    "confirmPublishTitle": "Publier « {title} » maintenant ?",
+    "confirmPublishDescription": "{count, plural, =0 {Personne ne correspond encore à ses destinataires.} one {# personne sera prévenue.} other {# personnes seront prévenues.}}",
+    "confirmDeleteTitle": "Supprimer « {title} » ?",
+    "confirmDeleteDescription": "Ses fichiers, ses lectures et ses notifications seront supprimés aussi. Attention, c'est définitif.",
+    "alreadyPublished": "Cette annonce est déjà publiée.",
+    "done": {
+      "draft": "Brouillon enregistré.",
+      "published": "Annonce publiée. {count, plural, =0 {Personne ne correspondait à ses destinataires.} one {# destinataire est en train d'être prévenu.} other {# destinataires sont en train d'être prévenus.}}",
+      "scheduled": "Annonce programmée. Elle partira à l'heure choisie.",
+      "updated": "Modifications enregistrées.",
+      "deleted": "Annonce supprimée."
+    }
+  },
+  "stats": {
+    "metaTitle": "Statistiques de l'annonce",
+    "metaTitleWith": "{title} · Statistiques",
+    "byline": "Par {author}",
+    "publishedOn": "publiée le {date}",
+    "scheduledFor": "programmée pour le {date}",
+    "draftEdited": "brouillon modifié le {date}",
+    "openInFeed": "Voir dans le fil",
+    "title": "Statistiques",
+    "notPublished": "Pas encore publiée : les lectures seront comptées après la publication. Le nombre de destinataires correspond à ceux qu'elle toucherait maintenant.",
+    "recipients": "Destinataires",
+    "reads": "Lectures",
+    "readRate": "Taux de lecture",
+    "readRateText": "{reads} destinataires sur {recipients}",
+    "notPublishedShort": "Pas encore publiée",
+    "audience": "Destinataires",
+    "message": "Message",
+    "chart": {
+      "title": "Lectures par jour",
+      "description": "Combien de destinataires l'ont ouverte chaque jour (heure du campus).",
+      "unavailable": "Les lectures par jour ne peuvent pas être chargées pour le moment.",
+      "empty": "Pas encore de lecture.",
+      "summary": "Lectures par jour : {total, plural, one {# lecture} other {# lectures}} sur {days, plural, one {# jour} other {# jours}}, surtout le {peakDate} ({peak}).",
+      "summaryNone": "Lectures par jour : aucune lecture sur {days, plural, one {# jour} other {# jours}}.",
+      "lastDays": "{days} derniers jours",
+      "reads": "{count, plural, one {# lecture} other {# lectures}}",
+      "showTable": "Afficher en tableau",
+      "tableCaption": "Lectures par jour",
+      "date": "Date",
+      "count": "Lectures"
+    }
+  }
+}
