@@ -149,6 +149,16 @@ const currentAcademicYear = (date = new Date(), timeZone = getAppTimezone()) => 
   return `${startYear}-${startYear + 1}`;
 };
 
+// Bounds of the academic year containing `date`: { start, end } = 1 September 00:00 (campus timezone) of its
+// first year and of the next year, as UTC Dates (end exclusive, i.e. the year runs until 31 August included).
+const academicYearBounds = (date = new Date(), timeZone = getAppTimezone()) => {
+  const startYear = Number(currentAcademicYear(date, timeZone).slice(0, 4));
+  return {
+    start: zonedTimeToUtc({ year: startYear, month: 9, day: 1 }, timeZone),
+    end: zonedTimeToUtc({ year: startYear + 1, month: 9, day: 1 }, timeZone),
+  };
+};
+
 module.exports = {
   DEFAULT_TIMEZONE,
   DAY_MS,
@@ -167,4 +177,5 @@ module.exports = {
   addLocalDays,
   isSameLocalDay,
   currentAcademicYear,
+  academicYearBounds,
 };

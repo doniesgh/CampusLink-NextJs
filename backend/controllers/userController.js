@@ -268,7 +268,16 @@ const updateUser = async (req, res) => {
   res.status(200).json(user);
 };
 
+// Number of SCHEDULED sessions of a teacher that have not ended yet (0 without the timetable module).
+const countUpcomingSessions = async (teacherId) => {
+  const { ClassSession } = mongoose.models;
+  if (!ClassSession) return 0;
+  return ClassSession.countDocuments({ teacher: teacherId, status: 'SCHEDULED', endsAt: { $gt: new Date() } });
+};
+
 // DELETE /api/users/:id [admin]
+// A TEACHER who still has SCHEDULED sessions that have not ended → 409 IN_USE (details.references.sessions):
+// reassign or cancel them first. Past and cancelled sessions do not block the deletion.
 const deleteUser = async (req, res) => {
   assertObjectId(req.params.id);
 
@@ -276,7 +285,17 @@ const deleteUser = async (req, res) => {
     throw new HttpError(400, 'CANNOT_DELETE_SELF', 'You cannot delete your own account');
   }
 
-  const user = await User.findByIdAndDelete(req.params.id).setOptions({ populateGroup: false });
+  const found = await User.findById(req.params.id).setOptions({ populateGroup: false });
+  if (!found) throw userNotFound();
+
+  if (found.role === 'TEACHER') {
+    const sessions = await countUpcomingSessions(found._id);
+    if (sessions > 0) {
+      throw new HttpError(409, 'IN_USE', 'This teacher still has scheduled sessions', { references: { sessions } });
+    }
+  }
+
+  const user = await User.findOneAndDelete({ _id: found._id }).setOptions({ populateGroup: false });
   if (!user) throw userNotFound();
 
   // Sessions, push subscriptions and in-app notifications of the account go with it.

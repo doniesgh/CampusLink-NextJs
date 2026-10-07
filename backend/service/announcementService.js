@@ -83,12 +83,18 @@ const feedFilter = (user) => {
 
 // ---------- Teacher restrictions ----------
 
-// Ids (strings) of the groups a teacher teaches, read from the timetable module (ClassSession).
-// Empty when the timetable module is not installed.
-const taughtGroupIds = async (user) => {
+// Ids (strings) of the groups a teacher teaches, read from the timetable module (ClassSession): groups of
+// their SCHEDULED sessions of the current academic year (1 September → 31 August, APP_TIMEZONE), the same
+// rule as timetableService.taughtSessionsFilter. Empty when the timetable module is not installed.
+const taughtGroupIds = async (user, { now = new Date() } = {}) => {
   const ClassSession = mongoose.models.ClassSession;
   if (!ClassSession || !user?._id) return new Set();
-  const ids = await ClassSession.distinct('groups', { teacher: user._id });
+  const { start, end } = time.academicYearBounds(now);
+  const ids = await ClassSession.distinct('groups', {
+    teacher: user._id,
+    status: 'SCHEDULED',
+    startsAt: { $gte: start, $lt: end },
+  });
   return new Set(ids.map((id) => String(id)));
 };
 

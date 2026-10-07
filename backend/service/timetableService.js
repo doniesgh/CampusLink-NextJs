@@ -127,10 +127,21 @@ const personalFilter = (user) => {
   return { filter: null, hint: null };
 };
 
-// Ids of the groups a teacher has sessions with (any status, any date).
-const taughtGroupIds = async (teacherId) => {
-  if (!teacherId || !mongoose.isObjectIdOrHexString(String(teacherId?._id ?? teacherId))) return [];
-  return ClassSession.distinct('groups', { teacher: teacherId?._id ?? teacherId });
+/**
+ * ClassSession filter of what makes a teacher "teach" a group: their SCHEDULED sessions (cancelled ones do
+ * not count) of the current academic year (1 September → 31 August, APP_TIMEZONE).
+ * Same rule as announcementService.taughtGroupIds.
+ */
+const taughtSessionsFilter = (teacherId, now = new Date()) => {
+  const { start, end } = time.academicYearBounds(now);
+  return { teacher: teacherId, status: 'SCHEDULED', startsAt: { $gte: start, $lt: end } };
+};
+
+// Ids of the groups a teacher teaches (taughtSessionsFilter).
+const taughtGroupIds = async (teacherId, { now = new Date() } = {}) => {
+  const id = teacherId?._id ?? teacherId;
+  if (!id || !mongoose.isObjectIdOrHexString(String(id))) return [];
+  return ClassSession.distinct('groups', taughtSessionsFilter(new mongoose.Types.ObjectId(String(id)), now));
 };
 
 // ---------- Session times ----------
@@ -547,6 +558,7 @@ module.exports = {
   findSessions,
   findSessionsByIds,
   personalFilter,
+  taughtSessionsFilter,
   taughtGroupIds,
   checkSessionTimes,
   localParts,
