@@ -9,7 +9,24 @@ if (!fs.existsSync(path.dirname(logFilePath))) {
 }
 
 const LOGGED_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
-const SENSITIVE_KEYS = ['password', 'currentpassword', 'newpassword', 'otp', 'token', 'refreshtoken', 'accesstoken'];
+// Compared in lower case. Also used by service/auditService.js to clean audit metadata.
+const SENSITIVE_KEYS = [
+  'password',
+  'currentpassword',
+  'newpassword',
+  'otp',
+  'token',
+  'refreshtoken',
+  'accesstoken',
+  'calendartoken',
+  'authorization',
+  'secret',
+  'privatekey',
+  // Push subscription secrets.
+  'endpoint',
+  'p256dh',
+  'auth',
+];
 const MAX_BODY_LENGTH = 2000;
 
 // Deep copy of the body with every secret replaced, so nothing sensitive reaches the log file.
@@ -53,3 +70,4 @@ const logger = (req, res, next) => {
 
 module.exports = logger;
 module.exports.redact = redact;
+module.exports.SENSITIVE_KEYS = SENSITIVE_KEYS;

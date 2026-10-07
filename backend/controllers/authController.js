@@ -5,8 +5,10 @@ const {
   isBlank,
   requireFields,
   normalizeEmail,
+  normalizeLocale,
   checkPassword,
   throwIfInvalid,
+  LOCALES,
 } = require('../utils/validation');
 const {
   hashToken,
@@ -16,6 +18,7 @@ const {
   revokeAllRefreshTokens,
 } = require('../service/tokenService');
 const { sendEmail, otpMailTemplate, passwordResetMailTemplate } = require('../service/mailService');
+const auditService = require('../service/auditService');
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -25,6 +28,7 @@ const otpMaxAttempts = () => Number(process.env.OTP_MAX_ATTEMPTS) || 5;
 const appUrl = () => (process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
 const otpInvalid = () => new HttpError(400, 'OTP_INVALID', 'Invalid or expired verification code');
+const resetTokenInvalid = () => new HttpError(400, 'RESET_TOKEN_INVALID', 'This reset link is invalid or has expired');
 
 // Both values are sha256 hex digests, so they always have the same length.
 const safeEqual = (a, b) => crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -37,6 +41,13 @@ const signup = async (req, res) => {
   const body = req.body ?? {};
   requireFields(body, ['firstname', 'lastname', 'email', 'password']);
 
+  // Optional locale ('fr' | 'en'), 'fr' by default.
+  let locale;
+  if (body.locale !== undefined && body.locale !== null) {
+    locale = normalizeLocale(body.locale);
+    if (!locale) throwIfInvalid({ locale: `Locale must be one of ${LOCALES.join(', ')}` });
+  }
+
   // Public signup always creates a STUDENT, whatever "role" the body contains.
   const user = new User({
     firstname: body.firstname,
@@ -44,6 +55,7 @@ const signup = async (req, res) => {
     email: body.email,
     password: body.password,
     role: 'STUDENT',
+    locale,
   });
   await user.validate();
 
@@ -74,7 +86,7 @@ const login = async (req, res) => {
   );
 
   try {
-    await sendEmail({ to: user.email, ...otpMailTemplate(otp) });
+    await sendEmail({ to: user.email, ...otpMailTemplate(otp, user.locale) });
   } catch (error) {
     console.error(`[auth] Could not send the login code to ${user.email}:`, error.message);
     await clearOtp(user._id);
@@ -151,36 +163,42 @@ const logout = async (req, res) => {
   res.status(204).end();
 };
 
+// Creates a reset token and emails the link. Runs after the response is sent; never throws.
+const sendPasswordResetLink = async (email) => {
+  try {
+    const token = crypto.randomBytes(32).toString('hex');
+    const user = await User.findOneAndUpdate(
+      { email },
+      {
+        $set: {
+          passwordResetHash: hashToken(token),
+          passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+        },
+      },
+      { returnDocument: 'after', projection: { email: 1, locale: 1 } }
+    );
+    if (!user) return;
+
+    const link = `${appUrl()}/reset-password?token=${token}`;
+    await sendEmail({ to: user.email, ...passwordResetMailTemplate(link, user.locale) });
+  } catch (error) {
+    console.error(`[auth] Could not send the password reset email to ${email}:`, error.message);
+  }
+};
+
 // POST /api/auth/forgot-password
-// Always answers 200 with the same message, so it cannot be used to discover accounts.
+// Always answers 200 with the same message, before looking up the account and sending the
+// email, so neither the answer nor its timing reveals which accounts exist.
 const forgotPassword = async (req, res) => {
   const { email } = req.body ?? {};
 
-  if (typeof email === 'string' && !isBlank(email)) {
-    const user = await User.findOne({ email: normalizeEmail(email) });
-
-    if (user) {
-      const token = crypto.randomBytes(32).toString('hex');
-      await User.updateOne(
-        { _id: user._id },
-        {
-          $set: {
-            passwordResetHash: hashToken(token),
-            passwordResetExpiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
-          },
-        }
-      );
-
-      const link = `${appUrl()}/reset-password?token=${token}`;
-      try {
-        await sendEmail({ to: user.email, ...passwordResetMailTemplate(link) });
-      } catch (error) {
-        console.error(`[auth] Could not send the password reset email to ${user.email}:`, error.message);
-      }
-    }
-  }
-
   res.status(200).json({ message: FORGOT_PASSWORD_MESSAGE });
+
+  if (typeof email === 'string' && !isBlank(email)) {
+    setImmediate(() => {
+      sendPasswordResetLink(normalizeEmail(email));
+    });
+  }
 };
 
 // POST /api/auth/reset-password
@@ -188,21 +206,37 @@ const resetPassword = async (req, res) => {
   const body = req.body ?? {};
   requireFields(body, ['token', 'password']);
 
-  const user = await User.findOne({
+  const tokenFilter = {
     passwordResetHash: hashToken(body.token.trim()),
     passwordResetExpiresAt: { $gt: new Date() },
-  }).select('+passwordResetHash +passwordResetExpiresAt');
-  if (!user) {
-    throw new HttpError(400, 'RESET_TOKEN_INVALID', 'This reset link is invalid or has expired');
+  };
+  if (!(await User.exists(tokenFilter))) {
+    throw resetTokenInvalid();
   }
 
   throwIfInvalid(checkPassword(body.password));
 
+  // Consume the token atomically: two parallel requests cannot both use it.
+  const user = await User.findOneAndUpdate(
+    tokenFilter,
+    { $unset: { passwordResetHash: 1, passwordResetExpiresAt: 1 } },
+    { returnDocument: 'after' }
+  );
+  if (!user) {
+    throw resetTokenInvalid();
+  }
+
   user.password = body.password;
-  user.passwordResetHash = undefined;
-  user.passwordResetExpiresAt = undefined;
   await user.save();
   await revokeAllRefreshTokens(user._id);
+
+  await auditService.record(req, {
+    actor: user,
+    action: 'auth.password_reset',
+    targetType: 'User',
+    targetId: user._id,
+    summary: `Password reset by email link for ${user.email}`,
+  });
 
   res.status(200).json({ message: 'Your password has been reset. You can now log in.' });
 };
@@ -221,6 +255,13 @@ const changePassword = async (req, res) => {
   user.password = body.newPassword;
   await user.save();
   await revokeAllRefreshTokens(user._id);
+
+  await auditService.record(req, {
+    action: 'auth.password_change',
+    targetType: 'User',
+    targetId: user._id,
+    summary: `Password changed by ${user.email}`,
+  });
 
   res.status(200).json({ message: 'Your password has been changed. Please log in again on your other devices.' });
 };

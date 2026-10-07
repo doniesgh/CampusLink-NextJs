@@ -8,10 +8,17 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
+const scheduler = require('./service/scheduler');
+const { isSmtpConfigured } = require('./service/mailService');
+const { isProduction, trustProxySetting } = require('./utils/env');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/user');
-const User = require('./models/userModel');
-const RefreshToken = require('./models/refreshTokenModel');
+const academicRoutes = require('./routes/academic');
+const notificationRoutes = require('./routes/notifications');
+const pushRoutes = require('./routes/push');
+const auditRoutes = require('./routes/audit');
+const timetableRoutes = require('./routes/timetable');
+const announcementRoutes = require('./routes/announcements');
 
 const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
 
@@ -22,9 +29,15 @@ const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
 
 const app = express();
 app.disable('x-powered-by');
+// req.ip is the real client IP behind the Next.js BFF / a reverse proxy (TRUST_PROXY, default "loopback").
+app.set('trust proxy', trustProxySetting());
 
 // Requests without an Origin header (mobile app, curl) are not affected by CORS.
 app.use(cors({ origin: corsOrigins }));
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 app.use(logger);
 
@@ -34,6 +47,12 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/academic', academicRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/push', pushRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/timetable', timetableRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', code: 'NOT_FOUND' });
@@ -49,17 +68,28 @@ const start = async () => {
     );
     process.exit(1);
   }
+  if (isProduction() && !isSmtpConfigured()) {
+    console.warn('[mail] NODE_ENV=production without SMTP_USER/SMTP_PASS: emails (2FA codes, reset links) will fail.');
+  }
 
   const port = Number(process.env.PORT) || 4000;
 
   try {
     await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
-    // Make sure the unique email index and the refresh token TTL index exist before serving requests.
-    await Promise.all([User.init(), RefreshToken.init()]);
   } catch (error) {
     console.error(`Could not connect to MongoDB (check MONGO_URI): ${error.message}`);
     process.exit(1);
   }
+  try {
+    // Make sure every index (unique, TTL, ...) of every registered model exists before serving requests.
+    await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
+  } catch (error) {
+    console.error(`Could not create the MongoDB indexes: ${error.message}`);
+    process.exit(1);
+  }
+
+  // Background jobs registered by the modules (e.g. scheduled announcements).
+  scheduler.start();
 
   // Express 5 calls this callback with an error when the server cannot start (e.g. port in use).
   const server = app.listen(port, (error) => {
@@ -70,12 +100,17 @@ const start = async () => {
     console.log(`CampusLink API listening on http://localhost:${port}`);
   });
 
+  let shuttingDown = false;
   const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    // Do not wait forever for open keep-alive connections or running jobs.
+    setTimeout(() => process.exit(0), 8000).unref();
+    const jobsStopped = scheduler.stop();
     server.close(() => {
-      mongoose.disconnect().finally(() => process.exit(0));
+      jobsStopped.finally(() => mongoose.disconnect().finally(() => process.exit(0)));
     });
-    // Do not wait forever for open keep-alive connections.
-    setTimeout(() => process.exit(0), 5000).unref();
+    server.closeIdleConnections?.();
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

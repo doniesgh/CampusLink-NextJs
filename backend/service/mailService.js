@@ -1,8 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const { normalizeLocale, DEFAULT_LOCALE } = require('../utils/validation');
+
+// Design charter colors.
+const BRAND_COLOR = '#253C6D';
+const TEXT_COLOR = '#1F2937';
+const MUTED_COLOR = '#6B7280';
+const BACKGROUND_COLOR = '#F4F5F7';
 
 const isSmtpConfigured = () => Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
+const isProduction = () => process.env.NODE_ENV === 'production';
 
 let transporter = null;
 
@@ -50,8 +58,13 @@ const appendToOutbox = async (mail) => {
 };
 
 // Throws when the email could not be sent; callers decide how to report it.
+// In production (NODE_ENV=production) without SMTP it fails, and the content is never logged.
 const sendEmail = async ({ to, subject, text, html }) => {
   if (!to) throw new Error('sendEmail: missing recipient');
+
+  if (!isSmtpConfigured() && isProduction()) {
+    throw new Error('SMTP is not configured (SMTP_USER/SMTP_PASS): emails cannot be sent in production');
+  }
 
   await getTransporter().sendMail({ from: getFrom(), to, subject, text, html });
 
@@ -72,56 +85,107 @@ const escapeHtml = (value) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-const layout = (title, bodyHtml) => `<!doctype html>
-<html lang="en">
-  <body style="margin:0;padding:24px;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:8px;padding:32px;">
-      <p style="margin:0 0 24px;font-size:20px;font-weight:bold;color:#2563eb;">CampusLink</p>
-      <h1 style="margin:0 0 16px;font-size:18px;">${escapeHtml(title)}</h1>
+const FOOTERS = {
+  fr: 'Cet e-mail a été envoyé automatiquement par CampusLink, merci de ne pas y répondre.',
+  en: 'This email was sent automatically by CampusLink, please do not reply.',
+};
+
+const pickLocale = (locale) => normalizeLocale(locale) || DEFAULT_LOCALE;
+
+const layout = (locale, title, bodyHtml) => `<!doctype html>
+<html lang="${locale}">
+  <body style="margin:0;padding:24px;background:${BACKGROUND_COLOR};font-family:Arial,Helvetica,sans-serif;color:${TEXT_COLOR};">
+    <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border-top:6px solid ${BRAND_COLOR};">
+      <p style="margin:0 0 24px;font-size:20px;font-weight:bold;color:${BRAND_COLOR};">CampusLink</p>
+      <h1 style="margin:0 0 16px;font-size:18px;color:${TEXT_COLOR};">${escapeHtml(title)}</h1>
       ${bodyHtml}
-      <p style="margin:32px 0 0;font-size:12px;color:#6b7280;">This email was sent automatically by CampusLink, please do not reply.</p>
+      <p style="margin:32px 0 0;font-size:12px;color:${MUTED_COLOR};">${escapeHtml(FOOTERS[locale])}</p>
     </div>
   </body>
 </html>`;
 
-const otpMailTemplate = (otp) => {
-  const subject = 'Your CampusLink verification code';
-  const text = [
-    `Your CampusLink verification code is: ${otp}`,
-    '',
-    'It expires in 10 minutes.',
-    'If you did not try to sign in, you can ignore this email and consider changing your password.',
-  ].join('\n');
-  const html = layout(
-    'Your verification code',
-    `<p style="margin:0 0 16px;">Use this code to finish signing in:</p>
-      <p style="margin:0 0 16px;font-size:32px;font-weight:bold;letter-spacing:8px;">${escapeHtml(otp)}</p>
-      <p style="margin:0;">It expires in 10 minutes. If you did not try to sign in, you can ignore this email and consider changing your password.</p>`
-  );
-  return { subject, text, html };
+const paragraph = (content, style = '') => `<p style="margin:0 0 16px;${style}">${content}</p>`;
+
+const OTP_TEXTS = {
+  fr: {
+    subject: 'Ton code de vérification CampusLink',
+    title: 'Ton code de vérification',
+    intro: 'Utilise ce code pour terminer ta connexion :',
+    line: (otp) => `Ton code de vérification CampusLink est : ${otp}`,
+    expires: 'Il expire dans 10 minutes.',
+    ignore: "Si tu n'as pas essayé de te connecter, ignore cet e-mail et pense à changer ton mot de passe.",
+  },
+  en: {
+    subject: 'Your CampusLink verification code',
+    title: 'Your verification code',
+    intro: 'Use this code to finish signing in:',
+    line: (otp) => `Your CampusLink verification code is: ${otp}`,
+    expires: 'It expires in 10 minutes.',
+    ignore: 'If you did not try to sign in, you can ignore this email and consider changing your password.',
+  },
 };
 
-const passwordResetMailTemplate = (link) => {
-  const subject = 'Reset your CampusLink password';
-  const text = [
-    'We received a request to reset your CampusLink password.',
-    '',
-    `Open this link to choose a new password (valid for 30 minutes): ${link}`,
-    '',
-    'If you did not ask for this, you can ignore this email: your password will not change.',
-  ].join('\n');
+// Login verification code (2FA), in the user's locale ('fr' by default).
+const otpMailTemplate = (otp, locale = DEFAULT_LOCALE) => {
+  const lang = pickLocale(locale);
+  const t = OTP_TEXTS[lang];
+  const text = [t.line(otp), '', t.expires, t.ignore].join('\n');
   const html = layout(
-    'Reset your password',
-    `<p style="margin:0 0 16px;">We received a request to reset your CampusLink password. This link is valid for 30 minutes.</p>
-      <p style="margin:0 0 16px;"><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;">Choose a new password</a></p>
-      <p style="margin:0 0 16px;font-size:12px;word-break:break-all;">Or copy this link: ${escapeHtml(link)}</p>
-      <p style="margin:0;">If you did not ask for this, you can ignore this email: your password will not change.</p>`
+    lang,
+    t.title,
+    `${paragraph(escapeHtml(t.intro))}
+      ${paragraph(escapeHtml(otp), `font-size:32px;font-weight:bold;letter-spacing:8px;color:${BRAND_COLOR};`)}
+      <p style="margin:0;">${escapeHtml(`${t.expires} ${t.ignore}`)}</p>`
   );
-  return { subject, text, html };
+  return { subject: t.subject, text, html };
+};
+
+const RESET_TEXTS = {
+  fr: {
+    subject: 'Réinitialise ton mot de passe CampusLink',
+    title: 'Réinitialise ton mot de passe',
+    intro: 'Nous avons reçu une demande de réinitialisation de ton mot de passe CampusLink.',
+    open: (link) => `Ouvre ce lien pour choisir un nouveau mot de passe (valable 30 minutes) : ${link}`,
+    validity: 'Ce lien est valable 30 minutes.',
+    button: 'Choisir un nouveau mot de passe',
+    copy: 'Ou copie ce lien :',
+    ignore: "Si tu n'es pas à l'origine de cette demande, ignore cet e-mail : ton mot de passe ne changera pas.",
+  },
+  en: {
+    subject: 'Reset your CampusLink password',
+    title: 'Reset your password',
+    intro: 'We received a request to reset your CampusLink password.',
+    open: (link) => `Open this link to choose a new password (valid for 30 minutes): ${link}`,
+    validity: 'This link is valid for 30 minutes.',
+    button: 'Choose a new password',
+    copy: 'Or copy this link:',
+    ignore: 'If you did not ask for this, you can ignore this email: your password will not change.',
+  },
+};
+
+// Password reset link, in the user's locale ('fr' by default).
+const passwordResetMailTemplate = (link, locale = DEFAULT_LOCALE) => {
+  const lang = pickLocale(locale);
+  const t = RESET_TEXTS[lang];
+  const text = [t.intro, '', t.open(link), '', t.ignore].join('\n');
+  const html = layout(
+    lang,
+    t.title,
+    `${paragraph(escapeHtml(`${t.intro} ${t.validity}`))}
+      ${paragraph(
+        `<a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 24px;background:${BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:999px;font-weight:bold;">${escapeHtml(t.button)}</a>`
+      )}
+      ${paragraph(`${escapeHtml(t.copy)} ${escapeHtml(link)}`, 'font-size:12px;word-break:break-all;')}
+      <p style="margin:0;">${escapeHtml(t.ignore)}</p>`
+  );
+  return { subject: t.subject, text, html };
 };
 
 module.exports = {
+  BRAND_COLOR,
+  isSmtpConfigured,
   sendEmail,
+  escapeHtml,
   otpMailTemplate,
   passwordResetMailTemplate,
 };
