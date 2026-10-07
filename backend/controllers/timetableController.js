@@ -30,7 +30,8 @@ const { analyzeImport } = require('../service/timetableImport');
 const { serializeSession, SESSION_TYPES, SESSION_STATUSES, NOTES_MAX_LENGTH, MAX_GROUPS } = ClassSession;
 const SCOPES = ['occurrence', 'series'];
 const UPDATABLE_FIELDS = ['subject', 'teacher', 'groups', 'room', 'startsAt', 'endsAt', 'type', 'notes', 'status'];
-const CALENDAR_TOKEN_RE = /^[A-Za-z0-9_-]{20,128}$/;
+// Calendar feed token: base64url(user id) "." base64url(HMAC-SHA256) (see "Calendar export" below).
+const CALENDAR_TOKEN_RE = /^([A-Za-z0-9_-]{16})\.([A-Za-z0-9_-]{43})$/;
 const SORT_COLLATION = { locale: 'en', strength: 2, numericOrdering: true };
 const MAX_AUDITED_IDS = 50;
 
@@ -621,39 +622,69 @@ const importSessions = async (req, res) => {
 
 // ---------- Calendar export ----------
 
-const newCalendarToken = () => crypto.randomBytes(24).toString('base64url');
-const feedUrl = (token) => `${publicApiUrl()}/api/timetable/ics/${token}.ics`;
+/*
+ * Feed URL token = base64url(user id, 12 bytes) + "." + base64url(HMAC-SHA256(JWT_SECRET, "<userId>:<nonce>")).
+ * Only the random nonce is stored (User.calendarNonce, select: false), so a database leak does not give
+ * the feed URLs. Resetting replaces the nonce: the old URL stops working. Changing JWT_SECRET changes
+ * every URL. Users still holding a clear-text `calendarToken` (before this scheme) get a nonce on their next
+ * calendar-link call, which also deletes that field; their old URL no longer works.
+ */
+const newCalendarNonce = () => crypto.randomBytes(32).toString('base64url');
+const calendarSignature = (userId, nonce) =>
+  crypto.createHmac('sha256', process.env.JWT_SECRET).update(`${userId}:${nonce}`).digest('base64url');
+const calendarToken = (userId, nonce) =>
+  `${Buffer.from(String(userId), 'hex').toString('base64url')}.${calendarSignature(String(userId), nonce)}`;
+const feedUrl = (userId, nonce) => `${publicApiUrl()}/api/timetable/ics/${calendarToken(userId, nonce)}.ics`;
 
-const readCalendarToken = async (userId) => {
-  const user = await User.findById(userId).select('+calendarToken').setOptions({ populateGroup: false }).lean();
-  return user?.calendarToken ?? null;
+// Writes a new nonce and removes the legacy clear-text token. `filter` narrows the update (lazy creation).
+// strict: false so the $unset of `calendarToken`, which is no longer in the schema, is kept.
+const writeCalendarNonce = (filter) =>
+  User.updateOne(filter, { $set: { calendarNonce: newCalendarNonce() }, $unset: { calendarToken: 1 } }, { strict: false });
+
+const readCalendarNonce = async (userId) => {
+  const user = await User.findById(userId).select('+calendarNonce').setOptions({ populateGroup: false }).lean();
+  return user?.calendarNonce ?? null;
 };
 
-// GET /api/timetable/me/calendar-link → { url } (the token is created on the first call).
+// The user a feed token belongs to (group populated), or null when the token is malformed, unknown or reset.
+const findCalendarOwner = async (token) => {
+  const match = CALENDAR_TOKEN_RE.exec(String(token || ''));
+  if (!match) return null;
+  const [, encodedId, signature] = match;
+  const userId = Buffer.from(encodedId, 'base64url').toString('hex');
+  // Canonical encoding only (base64url decoding ignores some trailing bits).
+  if (userId.length !== 24 || Buffer.from(userId, 'hex').toString('base64url') !== encodedId) return null;
+
+  const user = await User.findById(userId).select('+calendarNonce');
+  if (!user?.calendarNonce) return null;
+  const expected = Buffer.from(calendarSignature(userId, user.calendarNonce));
+  const given = Buffer.from(signature);
+  if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) return null;
+  return user;
+};
+
+// GET /api/timetable/me/calendar-link → { url } (the secret is created on the first call).
 const getCalendarLink = async (req, res) => {
-  let token = await readCalendarToken(req.user._id);
-  if (!token) {
-    // Conditional update: two concurrent first calls end up with the same token.
-    await User.updateOne(
-      { _id: req.user._id, calendarToken: { $not: { $type: 'string' } } },
-      { $set: { calendarToken: newCalendarToken() } }
-    );
-    token = await readCalendarToken(req.user._id);
+  let nonce = await readCalendarNonce(req.user._id);
+  if (!nonce) {
+    // Conditional update: two concurrent first calls end up with the same nonce.
+    await writeCalendarNonce({ _id: req.user._id, calendarNonce: { $not: { $type: 'string' } } });
+    nonce = await readCalendarNonce(req.user._id);
   }
-  res.status(200).json({ url: feedUrl(token) });
+  res.status(200).json({ url: feedUrl(req.user._id, nonce) });
 };
 
 // POST /api/timetable/me/calendar-link/reset → { url } with a new token (the old URL stops working).
 const resetCalendarLink = async (req, res) => {
-  const token = newCalendarToken();
-  await User.updateOne({ _id: req.user._id }, { $set: { calendarToken: token } });
+  await writeCalendarNonce({ _id: req.user._id });
+  const nonce = await readCalendarNonce(req.user._id);
   await auditService.record(req, {
     action: 'timetable.calendar_link.reset',
     targetType: 'User',
     targetId: req.user._id,
     summary: `Reset the calendar link of ${req.user.email}`,
   });
-  res.status(200).json({ url: feedUrl(token) });
+  res.status(200).json({ url: feedUrl(req.user._id, nonce) });
 };
 
 // Sessions of the feed: from 30 days ago to 120 days ahead.
@@ -679,9 +710,7 @@ const sendCalendar = async (res, user, disposition) => {
 
 // GET /api/timetable/ics/:token.ics (no auth) → text/calendar, or 404 RESOURCE_NOT_FOUND.
 const getCalendarFeed = async (req, res) => {
-  const { token } = req.params;
-  if (!CALENDAR_TOKEN_RE.test(String(token || ''))) throw notFound('Calendar');
-  const user = await User.findOne({ calendarToken: token });
+  const user = await findCalendarOwner(req.params.token);
   if (!user) throw notFound('Calendar');
   await sendCalendar(res, user, 'inline');
 };

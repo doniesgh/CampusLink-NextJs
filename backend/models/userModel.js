@@ -69,9 +69,10 @@ const userSchema = new Schema(
       default: null,
       index: true,
     },
-    // Secret of the personal ICS feed URL, created by the timetable module. Remove it with
-    // $unset (not null) so the partial unique index below ignores it.
-    calendarToken: { type: String, select: false },
+    // Random secret behind the personal ICS feed URL, created by the timetable module on the first
+    // calendar-link call. The URL token is derived from it (HMAC with JWT_SECRET) and never stored;
+    // replacing the nonce invalidates the previous URL.
+    calendarNonce: { type: String, select: false },
     // When enabled, login sends a one-time code by email before issuing tokens.
     twoFactorEnabled: {
       type: Boolean,
@@ -102,11 +103,6 @@ const userSchema = new Schema(
       }),
     },
   }
-);
-
-userSchema.index(
-  { calendarToken: 1 },
-  { unique: true, partialFilterExpression: { calendarToken: { $type: 'string' } } }
 );
 
 // True when the query projection keeps the `group` path.

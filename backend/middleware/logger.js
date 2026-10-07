@@ -19,6 +19,7 @@ const SENSITIVE_KEYS = [
   'refreshtoken',
   'accesstoken',
   'calendartoken',
+  'calendarnonce',
   'authorization',
   'secret',
   'privatekey',
