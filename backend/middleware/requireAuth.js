@@ -9,8 +9,12 @@ const getBearerToken = (req) => {
   return match ? match[1] : null;
 };
 
+const MAX_SESSION_ID_LENGTH = 128;
+
 // Verifies the access token and loads its user. Throws HttpError(401) on failure.
-const authenticate = async (token) => {
+// Returns { user, sessionId }: sessionId is the "sid" claim (login session), or null for tokens
+// issued before sessions had ids (they keep working).
+const authenticateToken = async (token) => {
   const payload = verifyAccessToken(token);
 
   if (!mongoose.isObjectIdOrHexString(payload.sub)) {
@@ -22,16 +26,24 @@ const authenticate = async (token) => {
     throw new HttpError(401, 'INVALID_TOKEN', 'Invalid access token');
   }
 
-  return user;
+  const { sid } = payload;
+  const sessionId = typeof sid === 'string' && sid !== '' && sid.length <= MAX_SESSION_ID_LENGTH ? sid : null;
+  return { user, sessionId };
 };
 
+// Same check, resolves to the user only.
+const authenticate = async (token) => (await authenticateToken(token)).user;
+
+// Sets req.user (full User document, group populated) and req.sessionId (string or null).
 const requireAuth = async (req, res, next) => {
   const token = getBearerToken(req);
   if (!token) {
     throw new HttpError(401, 'AUTH_REQUIRED', 'Authentication required');
   }
 
-  req.user = await authenticate(token);
+  const { user, sessionId } = await authenticateToken(token);
+  req.user = user;
+  req.sessionId = sessionId;
   next();
 };
 
@@ -48,4 +60,4 @@ const requireRole =
     next();
   };
 
-module.exports = { requireAuth, requireRole, getBearerToken, authenticate };
+module.exports = { requireAuth, requireRole, getBearerToken, authenticate, authenticateToken };

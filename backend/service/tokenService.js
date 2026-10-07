@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const RefreshToken = require('../models/refreshTokenModel');
+const PushSubscription = require('../models/pushSubscriptionModel');
 const User = require('../models/userModel');
 const HttpError = require('../utils/httpError');
 
@@ -10,8 +11,18 @@ const refreshTokenTtlMs = () => (Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 3
 
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
-const signAccessToken = (user) =>
-  jwt.sign({ role: user.role }, process.env.JWT_SECRET, {
+const newRefreshToken = () => crypto.randomBytes(48).toString('hex');
+
+// Stable random id of a login session (see models/refreshTokenModel.js).
+const newSessionId = () => crypto.randomBytes(16).toString('base64url');
+
+const userAgentOf = (req) => String(req?.headers?.['user-agent'] || '').slice(0, 512);
+
+const invalidRefreshToken = () => new HttpError(401, 'INVALID_REFRESH_TOKEN', 'Session expired, please log in again');
+
+// Access token: sub = user id, role, and sid = session id (absent from tokens issued before sessions had ids).
+const signAccessToken = (user, sessionId = null) =>
+  jwt.sign(sessionId ? { role: user.role, sid: sessionId } : { role: user.role }, process.env.JWT_SECRET, {
     subject: String(user._id),
     expiresIn: accessTokenTtl(),
     algorithm: 'HS256',
@@ -29,49 +40,90 @@ const verifyAccessToken = (token) => {
   }
 };
 
-// Returns the body sent to clients after a successful login, signup or refresh.
+// Returns the body sent to clients after a successful login, signup or OTP check: a new session.
 const issueTokens = async (user, req) => {
-  const refreshToken = crypto.randomBytes(48).toString('hex');
+  const refreshToken = newRefreshToken();
+  const sessionId = newSessionId();
 
   await RefreshToken.create({
     user: user._id,
     tokenHash: hashToken(refreshToken),
-    userAgent: String(req?.headers?.['user-agent'] || '').slice(0, 512),
+    sessionId,
+    userAgent: userAgentOf(req),
     expiresAt: new Date(Date.now() + refreshTokenTtlMs()),
   });
 
   return {
     user,
-    accessToken: signAccessToken(user),
+    accessToken: signAccessToken(user, sessionId),
     refreshToken,
   };
 };
 
-// Refresh tokens are single-use: each refresh deletes the old token and issues a new pair.
+// Refresh tokens are single-use: each refresh replaces the token hash of the session atomically and
+// issues a new pair. The session (document and sessionId) stays the same.
 const rotateRefreshToken = async (refreshToken, req) => {
   if (!refreshToken) {
     throw new HttpError(400, 'MISSING_FIELDS', 'refreshToken is required', { fields: ['refreshToken'] });
   }
 
-  const stored = await RefreshToken.findOneAndDelete({ tokenHash: hashToken(refreshToken) });
-  if (!stored || stored.expiresAt < new Date()) {
-    throw new HttpError(401, 'INVALID_REFRESH_TOKEN', 'Session expired, please log in again');
+  const nextToken = newRefreshToken();
+  const now = Date.now();
+  const stored = await RefreshToken.findOneAndUpdate(
+    { tokenHash: hashToken(refreshToken), expiresAt: { $gt: new Date(now) } },
+    {
+      $set: {
+        tokenHash: hashToken(nextToken),
+        userAgent: userAgentOf(req),
+        expiresAt: new Date(now + refreshTokenTtlMs()),
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  if (!stored) {
+    throw invalidRefreshToken();
   }
 
   const user = await User.findById(stored.user);
   if (!user) {
-    throw new HttpError(401, 'INVALID_REFRESH_TOKEN', 'Session expired, please log in again');
+    await RefreshToken.deleteOne({ _id: stored._id });
+    throw invalidRefreshToken();
   }
 
-  return issueTokens(user, req);
+  let { sessionId } = stored;
+  if (!sessionId) {
+    // Session opened before sessions had ids: it gets one now and keeps it from then on.
+    // Only the holder of the new token hash gets here, so nobody else writes this field.
+    sessionId = newSessionId();
+    await RefreshToken.updateOne({ _id: stored._id }, { $set: { sessionId } });
+  }
+
+  return {
+    user,
+    accessToken: signAccessToken(user, sessionId),
+    refreshToken: nextToken,
+  };
 };
 
-const revokeRefreshToken = (refreshToken) => RefreshToken.deleteOne({ tokenHash: hashToken(refreshToken) });
+// Ends one session (logout): deletes its refresh token and the push subscriptions it registered.
+// Resolves to the deleted session document, or null when the token is unknown.
+const revokeRefreshToken = async (refreshToken) => {
+  const stored = await RefreshToken.findOneAndDelete({ tokenHash: hashToken(refreshToken) });
+  if (stored?.sessionId) {
+    await PushSubscription.deleteMany({ user: stored.user, sessionId: stored.sessionId });
+  }
+  return stored;
+};
 
-const revokeAllRefreshTokens = (userId) => RefreshToken.deleteMany({ user: userId });
+// Ends every session of a user (password change or reset, account deletion): refresh tokens and
+// every push subscription of the user.
+const revokeAllRefreshTokens = async (userId) => {
+  await Promise.all([RefreshToken.deleteMany({ user: userId }), PushSubscription.deleteMany({ user: userId })]);
+};
 
 module.exports = {
   hashToken,
+  newSessionId,
   signAccessToken,
   verifyAccessToken,
   issueTokens,

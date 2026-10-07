@@ -4,6 +4,8 @@ const { throwIfInvalid } = require('../utils/validation');
 const pushService = require('../service/pushService');
 const { MAX_ENDPOINT_LENGTH, isAllowedPushEndpoint } = require('../utils/pushEndpoint');
 
+const { MAX_SUBSCRIPTIONS_PER_USER } = PushSubscription;
+
 const MAX_KEY_LENGTH = 256;
 const MAX_TOKEN_LENGTH = 4096;
 
@@ -53,11 +55,29 @@ const parseSubscription = (body) => {
   return null;
 };
 
-// POST /api/push/subscriptions [auth] → 201 { id }. Upsert by endpoint / token, re-assigned to the current user.
+// Keeps the user's MAX_SUBSCRIPTIONS_PER_USER most recently updated subscriptions (always `keepId`).
+const dropOldestSubscriptions = async (userId, keepId) => {
+  const extra = await PushSubscription.find({ user: userId, _id: { $ne: keepId } })
+    .sort({ updatedAt: -1, _id: -1 })
+    .skip(MAX_SUBSCRIPTIONS_PER_USER - 1)
+    .select('_id')
+    .lean();
+  if (extra.length > 0) {
+    await PushSubscription.deleteMany({ _id: { $in: extra.map((doc) => doc._id) } });
+  }
+};
+
+// POST /api/push/subscriptions [auth] → 201 { id }. Upsert by endpoint / token, re-assigned to the current user
+// and to the current login session (access token "sid"): logging out of that session deletes it.
 const subscribe = async (req, res) => {
   const { filter, values } = parseSubscription(req.body ?? {});
   const update = {
-    $set: { ...values, user: req.user._id, userAgent: String(req.get('user-agent') || '').slice(0, 512) },
+    $set: {
+      ...values,
+      user: req.user._id,
+      sessionId: req.sessionId ?? null,
+      userAgent: String(req.get('user-agent') || '').slice(0, 512),
+    },
   };
   const options = { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true };
 
@@ -69,6 +89,8 @@ const subscribe = async (req, res) => {
     if (error?.code !== 11000) throw error;
     subscription = await PushSubscription.findOneAndUpdate(filter, update, options);
   }
+
+  await dropOldestSubscriptions(req.user._id, subscription._id);
 
   res.status(201).json({ id: String(subscription._id) });
 };

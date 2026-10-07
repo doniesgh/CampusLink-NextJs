@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const webpush = require('web-push');
 const PushSubscription = require('../models/pushSubscriptionModel');
+const RefreshToken = require('../models/refreshTokenModel');
+const scheduler = require('./scheduler');
 const { envString } = require('../utils/env');
 const { isAllowedPushEndpoint } = require('../utils/pushEndpoint');
 
@@ -176,6 +178,50 @@ const sendToUsers = async (messages) => {
 // Sends the same payload to every subscription of one user. Never throws.
 const sendToUser = (userId, payload) => sendToUsers([{ userId, payload }]);
 
+// ---------- Subscriptions of ended sessions ----------
+
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+const PRUNE_BATCH_SIZE = 500;
+
+/**
+ * Deletes the subscriptions whose login session no longer exists (its refresh token expired and was
+ * removed by the TTL index, or is past its expiry). Logout and "revoke all" delete them right away; this
+ * job catches the sessions that simply expired. Subscriptions without a sessionId (registered with an
+ * access token issued before sessions had ids) are kept.
+ * @returns {Promise<number>} how many subscriptions were deleted
+ */
+const pruneEndedSessionSubscriptions = async () => {
+  let removed = 0;
+  const pruneBatch = async (sessionIds) => {
+    const live = new Set(
+      await RefreshToken.distinct('sessionId', { sessionId: { $in: sessionIds }, expiresAt: { $gt: new Date() } })
+    );
+    const ended = sessionIds.filter((id) => !live.has(id));
+    if (ended.length === 0) return;
+    const result = await PushSubscription.deleteMany({ sessionId: { $in: ended } });
+    removed += result.deletedCount ?? 0;
+  };
+
+  const cursor = PushSubscription.aggregate([
+    { $match: { sessionId: { $type: 'string' } } },
+    { $group: { _id: '$sessionId' } },
+  ]).cursor({ batchSize: PRUNE_BATCH_SIZE });
+  let batch = [];
+  for await (const { _id: sessionId } of cursor) {
+    batch.push(sessionId);
+    if (batch.length >= PRUNE_BATCH_SIZE) {
+      await pruneBatch(batch);
+      batch = [];
+    }
+  }
+  if (batch.length > 0) await pruneBatch(batch);
+
+  if (removed > 0) console.log(`[push] Deleted ${removed} subscription(s) of ended sessions.`);
+  return removed;
+};
+
+const pruneJob = scheduler.registerJob('push.prune-ended-sessions', PRUNE_INTERVAL_MS, pruneEndedSessionSubscriptions);
+
 module.exports = {
   isConfigured,
   getPublicKey,
@@ -183,4 +229,6 @@ module.exports = {
   sendToSubscription,
   sendToUsers,
   sendToUser,
+  pruneEndedSessionSubscriptions,
+  pruneJob,
 };
