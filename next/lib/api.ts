@@ -49,7 +49,7 @@ type ErrorBody = { error?: unknown; code?: unknown; details?: unknown };
  * TRUSTED_PROXY_HOPS: how many reverse proxies in front of Next.js append the client address to
  * X-Forwarded-For (0, the default, when Next.js is reached directly). Never more than 10.
  */
-function trustedProxyHops(): number {
+export function trustedProxyHops(): number {
   const value = Number.parseInt(process.env.TRUSTED_PROXY_HOPS ?? "", 10);
   return Number.isFinite(value) && value > 0 ? Math.min(value, 10) : 0;
 }

@@ -115,6 +115,7 @@
     "SESSION_CONFLICT": "Conflict with another session.",
     "IMPORT_INVALID": "The file has errors, so nothing was imported.",
     "FILE_TOO_LARGE": "A file is too large.",
+    "PAYLOAD_TOO_LARGE": "The request is too large.",
     "UNSUPPORTED_FILE_TYPE": "This file type isn't supported.",
     "TOO_MANY_FILES": "Too many files.",
     "AUDIENCE_NOT_ALLOWED": "You can't send to this audience."

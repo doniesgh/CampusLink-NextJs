@@ -115,6 +115,7 @@
     "SESSION_CONFLICT": "Conflit avec un autre cours.",
     "IMPORT_INVALID": "Le fichier contient des erreurs : rien n'a été importé.",
     "FILE_TOO_LARGE": "Un fichier est trop lourd.",
+    "PAYLOAD_TOO_LARGE": "La requête est trop volumineuse.",
     "UNSUPPORTED_FILE_TYPE": "Ce type de fichier n'est pas accepté.",
     "TOO_MANY_FILES": "Il y a trop de fichiers.",
     "AUDIENCE_NOT_ALLOWED": "Tu ne peux pas envoyer à ce public."

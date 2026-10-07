@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { toApiError } from "@/lib/api";
+import { contentSecurityPolicy, createNonce, CSP_HEADER } from "@/lib/csp";
 import { getTokenSubject, isTokenFresh } from "@/lib/jwt";
 import { refreshSessionOnce } from "@/lib/refresh";
 import { loginPath } from "@/lib/safe-next";
@@ -37,6 +38,11 @@ import type { Session } from "@/lib/types";
  *
  * Role checks are NOT done here (the role inside the JWT may be stale): pages call
  * `requireRole()` from lib/dal.ts, which uses the fresh user from the backend.
+ *
+ * Content-Security-Policy: every page answer (all routes but static files, /bff, the service worker and
+ * link prefetches) gets a policy with a fresh nonce (lib/csp.ts). The policy is also put on the forwarded
+ * request: Next.js reads the nonce there and adds it to the scripts and styles of the page it renders.
+ * Only /dashboard/*, /login and /signup go through the session logic below.
  *
  * Offline data and the end of a session:
  * - /dashboard pages carry `x-cl-owner: <user id>` (from the token): public/sw.js labels its offline copies
@@ -77,14 +83,15 @@ function redirectTo(request: NextRequest, path: string): NextResponse {
   return NextResponse.redirect(new URL(path, request.url));
 }
 
-/** Continues to the page, passing the (possibly updated) request headers plus x-cl-path. */
-function next(request: NextRequest, protectedRoute: boolean): NextResponse {
+/** Continues to the page, passing the (possibly updated) request headers plus x-cl-path and the CSP (nonce). */
+function next(request: NextRequest, protectedRoute: boolean, csp: string): NextResponse {
   const requestHeaders = new Headers(request.headers);
   if (protectedRoute) {
     requestHeaders.set(PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
   } else {
     requestHeaders.delete(PATH_HEADER);
   }
+  requestHeaders.set(CSP_HEADER, csp);
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
@@ -107,10 +114,20 @@ function clearSiteData(response: NextResponse): NextResponse {
 }
 
 export async function proxy(request: NextRequest) {
+  const csp = contentSecurityPolicy(createNonce());
+  const response = await route(request, csp);
+  response.headers.set(CSP_HEADER, csp);
+  return response;
+}
+
+async function route(request: NextRequest, csp: string): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
+  const protectedRoute = isProtected(pathname);
+  // Other pages only get the Content-Security-Policy.
+  if (!protectedRoute && !GUEST_ONLY.has(pathname)) return next(request, false, csp);
+
   const isNavigation = request.method === "GET" || request.method === "HEAD";
   const guestOnly = GUEST_ONLY.has(pathname) && isNavigation;
-  const protectedRoute = isProtected(pathname);
   const loginUrl = loginPath(`${pathname}${search}`);
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
@@ -119,14 +136,14 @@ export async function proxy(request: NextRequest) {
   // 1. Valid access token.
   if (accessToken && isTokenFresh(accessToken)) {
     if (guestOnly) return redirectTo(request, "/dashboard");
-    const response = next(request, protectedRoute);
+    const response = next(request, protectedRoute, csp);
     return protectedRoute && isNavigation ? withOwner(response, request, accessToken) : response;
   }
 
   // 2. No way to refresh.
   if (!refreshToken) {
     if (!protectedRoute || !isNavigation) {
-      const response = next(request, protectedRoute);
+      const response = next(request, protectedRoute, csp);
       return guestOnly && request.cookies.has(SESSION_ENDED_COOKIE) ? clearSiteData(response) : response;
     }
     const response = redirectTo(request, loginUrl);
@@ -149,7 +166,7 @@ export async function proxy(request: NextRequest) {
     }
     request.cookies.set(ACCESS_COOKIE, result.session.accessToken);
     request.cookies.set(REFRESH_COOKIE, result.session.refreshToken);
-    const response = next(request, protectedRoute);
+    const response = next(request, protectedRoute, csp);
     setSessionCookies(response.cookies, result.session, remember);
     const owner = getTokenSubject(result.session.accessToken);
     if (protectedRoute && isNavigation && owner) response.headers.set(OWNER_HEADER, owner);
@@ -160,16 +177,30 @@ export async function proxy(request: NextRequest) {
     request.cookies.delete(ACCESS_COOKIE);
     request.cookies.delete(REFRESH_COOKIE);
     const response =
-      protectedRoute && isNavigation ? redirectTo(request, loginUrl) : next(request, protectedRoute);
+      protectedRoute && isNavigation ? redirectTo(request, loginUrl) : next(request, protectedRoute, csp);
     clearSessionCookies(response.cookies);
     // Otherwise the login page this redirect leads to wipes the site data (cl_ended).
     return guestOnly ? clearSiteData(response) : response;
   }
 
   // Backend unreachable: let the page render and show the error (no redirect loop).
-  return next(request, protectedRoute);
+  return next(request, protectedRoute, csp);
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/signup"],
+  matcher: [
+    // Session logic: every request, link prefetches included.
+    "/dashboard/:path*",
+    "/login",
+    "/signup",
+    // Content-Security-Policy of the other pages: not for static files, the BFF, the service worker, the
+    // manifest or link prefetches (no HTML).
+    {
+      source: "/((?!_next/static|_next/image|bff/|api/|icons/|sw.js|manifest.webmanifest|favicon.ico|logo.png).*)",
+      missing: [
+        { type: "header", key: "next-router-prefetch" },
+        { type: "header", key: "purpose", value: "prefetch" },
+      ],
+    },
+  ],
 };
