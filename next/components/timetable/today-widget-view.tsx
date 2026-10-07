@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { ArrowRight, CalendarCheck, CalendarX, UsersRound } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useSessionChange } from "@/components/timetable/session-card";

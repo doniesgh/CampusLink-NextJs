@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { resetPasswordAction } from "@/app/actions/auth";

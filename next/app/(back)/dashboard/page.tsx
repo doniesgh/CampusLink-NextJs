@@ -1,6 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Bus, CalendarClock, CircleAlert, GraduationCap, MessagesSquare, ShieldCheck, ShoppingBag, UserRound, Users } from "lucide-react";
+import Link from "@/components/ui/app-link";
+import {
+  Bus,
+  CalendarClock,
+  CircleAlert,
+  GraduationCap,
+  MessagesSquare,
+  ShieldCheck,
+  ShoppingBag,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 import { LatestWidget } from "@/components/announcements/latest-widget";
 import { UnreadNotificationsWidget } from "@/components/notifications/unread-widget";
@@ -22,6 +33,36 @@ const upcoming = [
   { key: "forum", icon: MessagesSquare },
   { key: "alumni", icon: GraduationCap },
 ] as const;
+
+/**
+ * One term/value pair of the "Your account" list. A <dl> may only contain <dt>/<dd> groups (optionally wrapped
+ * in a <div>), so the icon lives inside the <dt> and is positioned in the left gutter.
+ */
+function AccountFact({
+  icon: Icon,
+  term,
+  valueProps,
+  children,
+}: {
+  icon: LucideIcon;
+  term: string;
+  valueProps?: Record<`data-${string}`, string>;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative min-h-10 pl-13">
+      <dt className="text-sm text-muted-foreground">
+        <span className="absolute left-0 top-0 flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        {term}
+      </dt>
+      <dd className="font-semibold" {...valueProps}>
+        {children}
+      </dd>
+    </div>
+  );
+}
 
 export default async function DashboardPage() {
   const [{ user, error }, t, tRoles, tStates, format] = await Promise.all([
@@ -79,49 +120,21 @@ export default async function DashboardPage() {
       <section aria-labelledby="account-heading" className="rounded-3xl border bg-card p-6 text-card-foreground sm:p-8">
         <h2 id="account-heading" className="text-xl font-semibold">{t("account.title")}</h2>
         <dl className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
-              <UserRound className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div>
-              <dt className="text-sm text-muted-foreground">{t("account.role")}</dt>
-              <dd className="font-semibold" data-role={user.role}>
-                {roleLabel}
-              </dd>
-            </div>
-          </div>
+          <AccountFact icon={UserRound} term={t("account.role")} valueProps={{ "data-role": user.role }}>
+            {roleLabel}
+          </AccountFact>
           {user.role === "STUDENT" && (
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
-                <Users className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <dt className="text-sm text-muted-foreground">{t("account.group")}</dt>
-                <dd className="font-semibold">
-                  {user.group ? `${user.group.name} · ${user.group.program.code}` : t("account.noGroup")}
-                </dd>
-              </div>
-            </div>
+            <AccountFact icon={Users} term={t("account.group")}>
+              {user.group ? `${user.group.name} · ${user.group.program.code}` : t("account.noGroup")}
+            </AccountFact>
           )}
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
-              <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div>
-              <dt className="text-sm text-muted-foreground">{t("account.twoFactor")}</dt>
-              <dd className="font-semibold">{user.twoFactorEnabled ? tStates("on") : tStates("off")}</dd>
-            </div>
-          </div>
+          <AccountFact icon={ShieldCheck} term={t("account.twoFactor")}>
+            {user.twoFactorEnabled ? tStates("on") : tStates("off")}
+          </AccountFact>
           {memberSince && (
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
-                <CalendarClock className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <dt className="text-sm text-muted-foreground">{t("account.memberSince")}</dt>
-                <dd className="font-semibold">{memberSince}</dd>
-              </div>
-            </div>
+            <AccountFact icon={CalendarClock} term={t("account.memberSince")}>
+              {memberSince}
+            </AccountFact>
           )}
         </dl>
       </section>

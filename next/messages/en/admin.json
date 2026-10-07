@@ -121,6 +121,58 @@
       "target": "Target",
       "ip": "IP"
     },
+    "actionLabels": {
+      "user": {
+        "create": "User created",
+        "update": "User updated",
+        "delete": "User deleted"
+      },
+      "auth": {
+        "password_reset": "Password reset",
+        "password_change": "Password changed"
+      },
+      "academic": {
+        "program": {
+          "create": "Program created",
+          "update": "Program updated",
+          "delete": "Program deleted"
+        },
+        "group": {
+          "create": "Group created",
+          "update": "Group updated",
+          "delete": "Group deleted"
+        },
+        "subject": {
+          "create": "Subject created",
+          "update": "Subject updated",
+          "delete": "Subject deleted"
+        },
+        "room": {
+          "create": "Room created",
+          "update": "Room updated",
+          "delete": "Room deleted"
+        }
+      },
+      "timetable": {
+        "session": {
+          "create": "Session created",
+          "update": "Session updated",
+          "cancel": "Session cancelled",
+          "delete": "Session deleted"
+        },
+        "import": "Timetable imported (CSV)",
+        "calendar_link": {
+          "reset": "Calendar link reset"
+        }
+      },
+      "announcement": {
+        "create": "Announcement created",
+        "publish": "Announcement published",
+        "schedule": "Announcement scheduled",
+        "update": "Announcement updated",
+        "delete": "Announcement deleted"
+      }
+    },
     "system": "System",
     "empty": "No entries match this filter."
   }

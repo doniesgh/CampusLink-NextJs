@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition as startBackgroundTransition, useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { useRouter } from "next/navigation";
 import { CalendarClock, FileUp, Loader2, Lock, Paperclip, Send, Users, X } from "lucide-react";
 import { useTranslations } from "next-intl";

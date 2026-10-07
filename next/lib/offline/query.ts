@@ -1,6 +1,6 @@
 // useOfflineQuery: stale-while-revalidate reads through the BFF, saved in IndexedDB (store "cache").
 // Client Components only. See next/README.md ("Data layer") for usage.
-import { useCallback, useEffect, useId, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useEffectEvent, useId, useMemo, useState, useSyncExternalStore } from "react";
 import { BffError, bffFetch } from "@/lib/bff-client";
 import { getDb } from "@/lib/offline/db";
 import { useDataOwner } from "@/lib/offline/owner";
@@ -19,6 +19,9 @@ type Entry = {
 };
 
 type ActiveQuery = { owner: string | null; id: string; path: string; count: number };
+
+/** The fallback options of useOfflineQuery and the key (serialized, without owner) they belong to. */
+type Seed = { id: string; data: unknown; savedAt: number | undefined; revalidateOnMount: boolean };
 
 const EMPTY: Entry = { data: undefined, savedAt: null, fromCache: false, error: null, isValidating: false, settled: false };
 const FOCUS_REVALIDATE_AFTER_MS = 5_000;
@@ -138,9 +141,13 @@ export function resetQueryMemory(): void {
 
 export type OfflineQueryOptions<T> = {
   /**
-   * Data rendered by the server (fresh): shown immediately, saved to IndexedDB, and it replaces older
-   * in-memory data when the component mounts. Combine with `revalidateOnMount: false` to make no
-   * request from the browser on page load.
+   * Data rendered by the server (fresh) for this key: shown immediately, saved to IndexedDB, and it replaces
+   * older in-memory data when the key mounts. Combine with `revalidateOnMount: false` to make no request from
+   * the browser on page load.
+   *
+   * It belongs to the key it was first passed with. When the key changes (filters, paging) while the same
+   * object is still passed, it is the previous key's data: the new key starts without it (and revalidates on
+   * mount). Pass a new object together with the new key to seed that key instead.
    */
   fallbackData?: T;
   /**
@@ -148,7 +155,10 @@ export type OfflineQueryOptions<T> = {
    * from the offline cache carries old data: it then loses against newer data saved in IndexedDB.
    */
   fallbackSavedAt?: number;
-  /** Fetch from the network on mount (default true). */
+  /**
+   * Fetch from the network on mount (default true). Applies to the key `fallbackData` belongs to; another
+   * key always revalidates on mount when a fallback was given for a different key.
+   */
   revalidateOnMount?: boolean;
   /** Fetch again when the tab becomes visible (default true). */
   revalidateOnFocus?: boolean;
@@ -195,22 +205,34 @@ export function useOfflineQuery<T>(key: QueryKey, path: string | null, options: 
   const id = serializeKey(key);
   const cacheKey = memoryKey(owner, id);
   const instanceId = useId();
-  const fallbackRef = useRef({ data: fallbackData, savedAt: fallbackSavedAt });
-  const revalidateOnMountRef = useRef(revalidateOnMount);
+
+  // The fallback options describe the key they were first passed with (not the owner: it may only be known
+  // after hydration). A new `fallbackData` object arriving with a new key belongs to that key.
+  const [seed, setSeed] = useState<Seed>(() => ({ id, data: fallbackData, savedAt: fallbackSavedAt, revalidateOnMount }));
+  let currentSeed = seed;
+  if (seed.id !== id && seed.data !== fallbackData) {
+    currentSeed = { id, data: fallbackData, savedAt: fallbackSavedAt, revalidateOnMount };
+    setSeed(currentSeed);
+  }
+  const ownSeed = currentSeed.id === id ? currentSeed : null;
+  const seedData = ownSeed?.data as T | undefined;
+  // `revalidateOnMount: false` vouched for a fallback: a key without its own fallback always revalidates.
+  const revalidateSeed = ownSeed ? ownSeed.revalidateOnMount : currentSeed.data === undefined ? revalidateOnMount : true;
+  const readSeed = useEffectEvent(() => ({ data: seedData, savedAt: ownSeed?.savedAt, revalidate: revalidateSeed }));
 
   const subscribe = useCallback((listener: () => void) => subscribeKey(cacheKey, listener), [cacheKey]);
   const entry = useSyncExternalStore(subscribe, () => getEntry(cacheKey), () => EMPTY);
 
-  // Mount: register, seed with server data, read IndexedDB, then revalidate.
+  // Mount (and every key change): register, seed with this key's server data, read IndexedDB, then revalidate.
   useEffect(() => {
     if (!path) return;
     const registered = active.get(cacheKey);
     active.set(cacheKey, { owner, id, path, count: (registered?.count ?? 0) + 1 });
 
+    const fallback = readSeed();
     let cancelled = false;
     void (async () => {
       // Server-rendered data replaces older data in memory; newer IndexedDB data (offline copy of an old page) wins.
-      const fallback = fallbackRef.current;
       if (fallback.data !== undefined) {
         const savedAt = fallback.savedAt ?? Date.now();
         const current = getEntry(cacheKey);
@@ -221,7 +243,7 @@ export function useOfflineQuery<T>(key: QueryKey, path: string | null, options: 
       }
       await loadFromStorage(cacheKey, owner, id);
       if (cancelled) return;
-      if (revalidateOnMountRef.current || getEntry(cacheKey).data === undefined) {
+      if (fallback.revalidate || getEntry(cacheKey).data === undefined) {
         await revalidate(cacheKey, owner, id, path);
       }
     })();
@@ -266,7 +288,7 @@ export function useOfflineQuery<T>(key: QueryKey, path: string | null, options: 
     [cacheKey, owner, id]
   );
 
-  const data = (entry.data !== undefined ? entry.data : fallbackData) as T | undefined;
+  const data = (entry.data !== undefined ? entry.data : seedData) as T | undefined;
   return {
     data,
     savedAt: entry.savedAt,

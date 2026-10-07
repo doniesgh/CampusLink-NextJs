@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { ArrowRight, Megaphone, PenLine } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { AnnouncementCard } from "@/components/announcements/announcement-card";

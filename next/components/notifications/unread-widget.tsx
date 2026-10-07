@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { ArrowRight, BellOff } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { NotificationItem } from "@/components/notifications/notification-item";

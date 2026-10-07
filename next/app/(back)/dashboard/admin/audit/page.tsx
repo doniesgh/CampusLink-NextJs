@@ -25,9 +25,18 @@ const AUDIT_ACTIONS = [
   "user.delete",
   "auth.password_reset",
   "auth.password_change",
-  ...["program", "group", "subject", "room"].flatMap((resource) =>
-    ["create", "update", "delete"].map((verb) => `academic.${resource}.${verb}`)
-  ),
+  "academic.program.create",
+  "academic.program.update",
+  "academic.program.delete",
+  "academic.group.create",
+  "academic.group.update",
+  "academic.group.delete",
+  "academic.subject.create",
+  "academic.subject.update",
+  "academic.subject.delete",
+  "academic.room.create",
+  "academic.room.update",
+  "academic.room.delete",
   "timetable.session.create",
   "timetable.session.update",
   "timetable.session.cancel",
@@ -39,6 +48,11 @@ const AUDIT_ACTIONS = [
   "announcement.update",
   "announcement.delete",
 ] as const;
+
+/** Action codes with a readable label (`admin.audit.actionLabels.<code>`); other codes are shown as they are. */
+const LABELLED_ACTIONS: ReadonlySet<string> = new Set([...AUDIT_ACTIONS, "timetable.calendar_link.reset"]);
+type LabelledAction = (typeof AUDIT_ACTIONS)[number] | "timetable.calendar_link.reset";
+const isLabelled = (action: string): action is LabelledAction => LABELLED_ACTIONS.has(action);
 
 const ACTION_RE = /^[a-z0-9_.-]{1,64}$/i;
 const PAGE_SIZE = 50;
@@ -87,6 +101,9 @@ export default async function AdminAuditPage({ searchParams }: Readonly<{ search
     loadError = errors.message(toApiError(e));
   }
 
+  const actionLabel = (action: string): string | null => (isLabelled(action) ? t(`actionLabels.${action}`) : null);
+  const filterOptions = actionOptions.map((value) => ({ value, label: actionLabel(value) ?? value }));
+
   const target = (entry: AuditLog) => {
     const label = entry.summary || [entry.targetType, entry.targetId].filter(Boolean).join(" ");
     return label || "—";
@@ -95,7 +112,7 @@ export default async function AdminAuditPage({ searchParams }: Readonly<{ search
   return (
     <div className="container space-y-6 py-6 sm:py-10">
       <PageHeader title={t("title")} description={t("subtitle")} />
-      <ActionFilter value={action} actions={actionOptions} />
+      <ActionFilter value={action} options={filterOptions} />
 
       {loadError ? (
         <InlineFeedback feedback={{ type: "error", message: loadError }} />
@@ -114,30 +131,40 @@ export default async function AdminAuditPage({ searchParams }: Readonly<{ search
               </TableRow>
             </TableHeader>
             <TableBody>
-              {list.items.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell className="whitespace-nowrap">
-                    <time dateTime={entry.createdAt}>{format.dateTime(new Date(entry.createdAt), "dateTime")}</time>
-                  </TableCell>
-                  <TableCell>
-                    {entry.actor ? (
-                      <>
-                        <span className="font-medium">
-                          {entry.actor.firstname} {entry.actor.lastname}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">{entry.actor.email}</span>
-                      </>
-                    ) : (
-                      <span className="text-muted-foreground">{t("system")}</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <code className="rounded-lg bg-muted px-2 py-0.5 text-xs">{entry.action}</code>
-                  </TableCell>
-                  <TableCell className="max-w-md">{target(entry)}</TableCell>
-                  <TableCell className="whitespace-nowrap font-mono text-xs">{entry.ip || "—"}</TableCell>
-                </TableRow>
-              ))}
+              {list.items.map((entry) => {
+                const label = actionLabel(entry.action);
+                return (
+                  <TableRow key={entry.id}>
+                    <TableCell className="whitespace-nowrap">
+                      <time dateTime={entry.createdAt}>{format.dateTime(new Date(entry.createdAt), "dateTime")}</time>
+                    </TableCell>
+                    <TableCell>
+                      {entry.actor ? (
+                        <>
+                          <span className="font-medium">
+                            {entry.actor.firstname} {entry.actor.lastname}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">{entry.actor.email}</span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">{t("system")}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {label ? (
+                        <>
+                          <span className="font-medium">{label}</span>
+                          <code className="block text-xs text-muted-foreground">{entry.action}</code>
+                        </>
+                      ) : (
+                        <code className="rounded-lg bg-muted px-2 py-0.5 text-xs">{entry.action}</code>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-md">{target(entry)}</TableCell>
+                    <TableCell className="whitespace-nowrap font-mono text-xs">{entry.ip || "—"}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           <Pagination

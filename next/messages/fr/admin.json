@@ -121,6 +121,58 @@
       "target": "Cible",
       "ip": "IP"
     },
+    "actionLabels": {
+      "user": {
+        "create": "Utilisateur créé",
+        "update": "Utilisateur modifié",
+        "delete": "Utilisateur supprimé"
+      },
+      "auth": {
+        "password_reset": "Mot de passe réinitialisé",
+        "password_change": "Mot de passe changé"
+      },
+      "academic": {
+        "program": {
+          "create": "Filière créée",
+          "update": "Filière modifiée",
+          "delete": "Filière supprimée"
+        },
+        "group": {
+          "create": "Groupe créé",
+          "update": "Groupe modifié",
+          "delete": "Groupe supprimé"
+        },
+        "subject": {
+          "create": "Matière créée",
+          "update": "Matière modifiée",
+          "delete": "Matière supprimée"
+        },
+        "room": {
+          "create": "Salle créée",
+          "update": "Salle modifiée",
+          "delete": "Salle supprimée"
+        }
+      },
+      "timetable": {
+        "session": {
+          "create": "Séance créée",
+          "update": "Séance modifiée",
+          "cancel": "Séance annulée",
+          "delete": "Séance supprimée"
+        },
+        "import": "Emploi du temps importé (CSV)",
+        "calendar_link": {
+          "reset": "Lien d'agenda réinitialisé"
+        }
+      },
+      "announcement": {
+        "create": "Annonce créée",
+        "publish": "Annonce publiée",
+        "schedule": "Annonce programmée",
+        "update": "Annonce modifiée",
+        "delete": "Annonce supprimée"
+      }
+    },
     "system": "Système",
     "empty": "Aucune entrée ne correspond à ce filtre."
   }

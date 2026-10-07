@@ -5,13 +5,18 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Select } from "@/components/ui/select";
 
-/** "Action" filter of the audit log: updates ?action= (the server page reloads the list). */
-export function ActionFilter({ value, actions }: { value: string; actions: readonly string[] }) {
+export type ActionOption = { value: string; label: string };
+
+/**
+ * "Action" filter of the audit log: updates ?action= (the server page reloads the list).
+ * Options show the readable label of each action code (the code itself when unknown); values are the codes.
+ */
+export function ActionFilter({ value, options: known }: { value: string; options: readonly ActionOption[] }) {
   const t = useTranslations("admin.audit");
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
-  const options = value && !actions.includes(value) ? [value, ...actions] : actions;
+  const options = value && !known.some((option) => option.value === value) ? [{ value, label: value }, ...known] : known;
 
   return (
     <div className="space-y-2 sm:w-80">
@@ -28,9 +33,9 @@ export function ActionFilter({ value, actions }: { value: string; actions: reado
         }}
       >
         <option value="">{t("allActions")}</option>
-        {options.map((action) => (
-          <option key={action} value={action}>
-            {action}
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </Select>

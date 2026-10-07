@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { KeyRound, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { loginAction } from "@/app/actions/auth";

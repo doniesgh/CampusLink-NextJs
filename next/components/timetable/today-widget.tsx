@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { ArrowRight, CalendarCog, GraduationCap, UsersRound } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { TodayWidgetView } from "@/components/timetable/today-widget-view";

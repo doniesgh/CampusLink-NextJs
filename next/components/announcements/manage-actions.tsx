@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { useRouter } from "next/navigation";
 import { Pencil, Send, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";

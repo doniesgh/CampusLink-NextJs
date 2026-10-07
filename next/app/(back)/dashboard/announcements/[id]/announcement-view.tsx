@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { ArrowLeft, BarChart3, CloudOff } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { AnnouncementBody } from "@/components/announcements/announcement-body";

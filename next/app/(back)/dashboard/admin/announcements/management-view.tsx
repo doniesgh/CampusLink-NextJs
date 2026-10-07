@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { PenLine, Send } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { PriorityBadge, StatusBadge } from "@/components/announcements/badges";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { CalendarCog, ChevronLeft, ChevronRight, CloudOff, RefreshCw, UsersRound } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { CalendarLinkPanel, ExportMenu, useCalendarExport } from "@/components/timetable/export-menu";

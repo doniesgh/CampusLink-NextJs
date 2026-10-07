@@ -57,11 +57,37 @@ export async function enablePush(vapidPublicKey: string): Promise<void> {
     throw new PushSetupError("failed");
   }
 
+  await bffFetch("/push/subscriptions", { method: "POST", body: subscriptionBody(subscription) });
+}
+
+/** Body of POST /push/subscriptions for a browser subscription. */
+function subscriptionBody(subscription: PushSubscription) {
   const json = subscription.toJSON();
-  await bffFetch("/push/subscriptions", {
-    method: "POST",
-    body: { type: "web", endpoint: subscription.endpoint, keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth } },
-  });
+  return { type: "web", endpoint: subscription.endpoint, keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth } };
+}
+
+/**
+ * Registers this browser's existing push subscription again for the current session (backend upsert by
+ * endpoint, idempotent). The backend drops every subscription of the user when all sessions are revoked
+ * (change password) and ties each one to the login session that registered it: without this, the toggle
+ * would keep showing "subscribed" while nothing reaches this browser anymore.
+ * Never asks for permission, never subscribes a browser that is not subscribed, never throws.
+ */
+export async function resyncPushSubscription(): Promise<void> {
+  try {
+    if (!isSupported() || Notification.permission !== "granted") return;
+    const reg = await registration();
+    const subscription = await reg?.pushManager.getSubscription();
+    if (!subscription) return;
+    // A 401 here is not this call's business: the page's own requests handle an ended session.
+    await bffFetch("/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody(subscription),
+      redirectOnUnauthorized: false,
+    });
+  } catch {
+    // Best effort: the next tab session (or the account page toggle) tries again.
+  }
 }
 
 /** Unregisters this device on the backend, then unsubscribes the browser. */

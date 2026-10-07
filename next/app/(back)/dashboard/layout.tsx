@@ -1,3 +1,4 @@
+import { ClientMessages, DASHBOARD_NAMESPACES } from "@/components/i18n/client-messages";
 import { DataLayerProvider } from "@/components/offline/data-layer-provider";
 import { AppShell } from "@/components/shell/app-shell";
 import { getCurrentUser } from "@/lib/dal";
@@ -13,23 +14,27 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   if (!user) {
     // Backend unreachable: the page itself explains the problem.
     return (
-      <AppShell user={null} unreadCount={0}>
-        {children}
-      </AppShell>
+      <ClientMessages namespaces={DASHBOARD_NAMESPACES}>
+        <AppShell user={null} unreadCount={0}>
+          {children}
+        </AppShell>
+      </ClientMessages>
     );
   }
 
   const unread = await serverSnapshot<{ count?: number } | null>("/notifications/unread-count", null);
 
   return (
-    <DataLayerProvider userId={user.id}>
-      <AppShell
-        user={{ firstname: user.firstname, lastname: user.lastname, email: user.email, role: user.role }}
-        unreadCount={typeof unread.data?.count === "number" ? unread.data.count : 0}
-        renderedAt={unread.savedAt}
-      >
-        {children}
-      </AppShell>
-    </DataLayerProvider>
+    <ClientMessages namespaces={DASHBOARD_NAMESPACES}>
+      <DataLayerProvider userId={user.id}>
+        <AppShell
+          user={{ firstname: user.firstname, lastname: user.lastname, email: user.email, role: user.role }}
+          unreadCount={typeof unread.data?.count === "number" ? unread.data.count : 0}
+          renderedAt={unread.savedAt}
+        >
+          {children}
+        </AppShell>
+      </DataLayerProvider>
+    </ClientMessages>
   );
 }

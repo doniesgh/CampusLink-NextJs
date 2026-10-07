@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/app-link";
 import { Paperclip } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { NewBadge, PriorityBadge } from "@/components/announcements/badges";
 import { referenceDate, useAuthorName, useDateTimeLabel } from "@/components/announcements/use-format";
-import { useOnlineStatus } from "@/lib/offline";
 import { detailHref } from "@/lib/announcements/paths";
 import type { Announcement } from "@/lib/announcements/types";
 import { cn } from "@/lib/utils";
@@ -35,7 +34,6 @@ export function AnnouncementCard({
   const t = useTranslations("announcements.feed");
   const authorName = useAuthorName();
   const dateLabel = useDateTimeLabel();
-  const online = useOnlineStatus();
   const Heading = headingLevel;
   const date = referenceDate(announcement);
   const files = announcement.attachments?.length ?? 0;
@@ -55,8 +53,7 @@ export function AnnouncementCard({
       <Heading className={cn("font-semibold leading-snug text-foreground", compact ? "text-sm" : "text-base sm:text-lg")}>
         <Link
           href={detailHref(announcement.id)}
-          // Offline: no prefetch requests (they would only fail); clicks are handled by onLinkClick.
-          prefetch={online ? undefined : false}
+          // AppLink makes no prefetch requests offline (they would only fail); clicks are handled by onLinkClick.
           onClick={onLinkClick ? (event) => onLinkClick(event, announcement) : undefined}
           className="rounded-sm after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none"
         >

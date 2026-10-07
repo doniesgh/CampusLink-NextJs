@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PasswordInput } from "@/components/auth/password-input";
 import { useValidationMessages } from "@/lib/i18n/client";
+import { resyncPushSubscription } from "@/lib/offline/push";
 import type { ActionState } from "@/lib/server-api";
 import type { Role } from "@/lib/types";
 import { formText, hasErrors, summarize, validateChangePassword, validateProfile } from "@/lib/validation";
@@ -85,7 +86,12 @@ export function AccountView({ user, vapidPublicKey }: { user: AccountUser; vapid
   const [, passwordAction, passwordPending] = useActionState(async (prev: ActionState, formData: FormData) => {
     const result = await changePasswordAction(prev, formData);
     setPasswordErrors(result.fieldErrors ?? {});
-    if (result.ok) setPasswordFormKey((key) => key + 1);
+    if (result.ok) {
+      setPasswordFormKey((key) => key + 1);
+      // The backend dropped this user's push subscriptions with the old sessions: the new session takes this
+      // browser's subscription back, so notifications keep arriving and the push toggle stays truthful.
+      void resyncPushSubscription();
+    }
     show("password", result.message ? { type: result.ok ? "success" : "error", message: result.message } : null);
     return result;
   }, initialState);

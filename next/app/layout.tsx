@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
-import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { ClientMessages } from "@/components/i18n/client-messages";
 import { ConnectivityBanner } from "@/components/pwa/connectivity-banner";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
+import { StyleNonce } from "@/components/security/style-nonce";
 import "./globals.css";
 
 // Body text: Inter (variable font, covers the 400/500 weights used for copy).
@@ -64,11 +65,13 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">
-        <NextIntlClientProvider>
+        {/* Client Components get the common and offline messages; route groups add their own namespaces. */}
+        <ClientMessages>
           <ConnectivityBanner />
           {children}
           <ServiceWorkerRegistrar />
-        </NextIntlClientProvider>
+          <StyleNonce />
+        </ClientMessages>
       </body>
     </html>
   );
