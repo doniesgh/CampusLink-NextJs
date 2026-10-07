@@ -53,6 +53,148 @@ scripts/               create-admin, generate-vapid, seed-demo (+ seed/*.js plug
 - Dates are stored in UTC; anything "per day / per week" uses `APP_TIMEZONE` through `utils/time.js`.
 - Look up another module's model with `mongoose.models.<Name>` and check that it is registered.
 
+## Sessions and rate limiting — `/api/auth`
+
+- **Sessions.** Login, signup and verify-otp open a session: one `RefreshToken` document (SHA-256 of the token)
+  with a random `sessionId`. The access token carries it as the `sid` claim (`req.sessionId`). `POST /refresh`
+  rewrites that document in place (new token hash and expiry, single-use as before), so the session keeps its
+  `sessionId`; a session opened before session ids existed gets one on its next refresh. `POST /logout` deletes the
+  session and its push subscriptions. Password change/reset and admin password changes revoke every session and
+  push subscription of the user.
+- **Rate limits** (`middleware/rateLimit.js`, in memory, per instance): every limiter answers
+  `429 TOO_MANY_REQUESTS` with a `Retry-After` header and `details.retryAfter` (seconds), and is skipped with
+  `RATE_LIMIT_ENABLED=false`. The client IP is `req.ip` (`TRUST_PROXY`).
+
+| Routes | Key | Limit per `RATE_LIMIT_WINDOW_MS` (default 15 min) |
+| ------ | --- | ------------------------------------------------- |
+| `signup`, `login`, `verify-otp`, `forgot-password` (each) | route + IP + normalized email | `RATE_LIMIT_AUTH_MAX` (20) |
+| the same four routes together | IP (not applied to loopback callers without `X-Forwarded-For`) | `RATE_LIMIT_IP_MAX` (100) |
+| `change-password` | signed-in user | `RATE_LIMIT_PASSWORD_MAX` (10) |
+| `reset-password` | IP (not applied to loopback callers without `X-Forwarded-For`) | `RATE_LIMIT_RESET_MAX` (20) |
+
+The per-email limiter runs before the per-IP one, so requests it refuses do not use up the budget of everyone
+behind the same address (campus NAT). `refresh` and `logout` are not limited.
+
+The two IP-only limiters are not applied when `req.ip` is a loopback address (`127.0.0.0/8`, `::1`,
+`::ffff:127.x.x.x`), i.e. a caller on this host that sent no `X-Forwarded-For`: the Next.js web app relays every
+browser from loopback, and without a forwarded client address one counter would be shared by all web users (one
+person sending bad logins would lock everyone out). Such requests keep the route + IP + email limit. Set
+`TRUSTED_PROXY_HOPS` on the web app so it forwards the client IP (production: nginx in front of Next.js and
+`TRUSTED_PROXY_HOPS=1`, see `next/README.md`); behind a proxy that writes `X-Forwarded-For`, `req.ip` is the real
+client and the per-IP limits apply to web users and to direct API clients (mobile app) alike.
+
+## Timetable module — `/api/timetable` (Module 1)
+
+Code: `models/classSessionModel.js`, `controllers/timetableController.js`, `service/timetableService.js`
+(ranges, conflicts, series, notifications), `service/timetableImport.js` (CSV), `service/icsService.js` (iCalendar).
+
+| Endpoint | Who | Answer |
+| -------- | --- | ------ |
+| `GET /me?from&to&subject&teacher` | any | `{ from, to, items, hint? }`: STUDENT = their group (`hint: "NO_GROUP"` without one), TEACHER = sessions they teach, others `[]` |
+| `GET /?group\|teacher\|room&from&to&subject` | any | `{ from, to, items }`; at least one of group/teacher/room (else `400 MISSING_FIELDS`) |
+| `GET /me/groups` | any | STUDENT: own group; TEACHER: groups they teach (see below) |
+| `GET /sessions/:id` | any | ClassSession |
+| `POST /sessions` | ADMIN | `201 { items, seriesId }` |
+| `PATCH /sessions/:id` | ADMIN | `200 { items }` (every occurrence of the scope) |
+| `DELETE /sessions/:id?scope=` | ADMIN | `204`, no notification (for mistakes; cancel instead) |
+| `POST /import` | ADMIN | multipart CSV, see below |
+| `GET /me/calendar-link`, `POST /me/calendar-link/reset` | any | `{ url }` of the ICS feed |
+| `GET /ics/:token.ics` | no auth | `text/calendar` (inline) |
+| `GET /me/calendar.ics` | any | the same calendar as a download (`attachment`) |
+
+- **Ranges**: `from`/`to` are `YYYY-MM-DD` (00:00 campus time), campus wall-clock `YYYY-MM-DDTHH:mm` or ISO with
+  an offset; `to` is exclusive. Default: the current week (Monday 00:00 → next Monday). More than 62 days →
+  `400 RANGE_TOO_LARGE`. Cancelled sessions are included.
+- **Validation**: `endsAt > startsAt`, same day in `APP_TIMEZONE`, at most 8 h; `teacher` must be a TEACHER;
+  1 to 20 groups; subject, groups and room must exist; notes ≤ 1000 characters; `type` ∈ LECTURE, TUTORIAL, LAB, EXAM, OTHER.
+- **Series**: `repeat: { until: "YYYY-MM-DD" }` on create makes a weekly series (same weekday and wall-clock time,
+  DST-safe, at most 26 occurrences) sharing a `seriesId`. `PATCH` and `DELETE` take `scope` (body or query):
+  `occurrence` (default) or `series` = this occurrence and the following ones of its series. In a series update,
+  a time change moves every following occurrence by the same number of days to the new wall-clock times; sending
+  only `startsAt` keeps the duration. `status: "CANCELLED"` cancels, `"SCHEDULED"` restores. `change`
+  (`ROOM` | `TIME` | `CANCELLED`, with the previous room/times) tells clients "Moved from B12" / "Cancelled".
+- **Conflicts**: a SCHEDULED session overlapping another SCHEDULED one with the same room, teacher or any group →
+  `409 SESSION_CONFLICT`, `details.conflicts: [{ sessionId, startsAt, endsAt, reason: ROOM | TEACHER | GROUP,
+  subject }]`. Every occurrence of a series is checked and nothing is written if one conflicts. Cancelled sessions
+  never conflict; restoring one is checked.
+- **Notifications**: a room change, time change, cancellation or restoration of a session that starts in the
+  future and within `NOTIFY_HORIZON_DAYS` (14) sends one `TIMETABLE_CHANGE` notification + push per user (students
+  of the old and new groups, old and new teacher), even for a whole series; link `/dashboard/timetable?date=…`.
+- **Groups a teacher teaches** (`/me/groups` and the announcement audience rule): groups of the teacher's
+  **SCHEDULED** sessions of the **current academic year** (1 September → 31 August, `APP_TIMEZONE`);
+  `timetableService.taughtSessionsFilter(teacherId)`.
+- **CSV import** (`POST /import`, multipart `file`, optional `dryRun=true|false`): UTF-8, `,` or `;` separator
+  (detected on the header line), at most 2000 rows and 2 MB. Columns (any order, header names as below):
+
+  ```csv
+  date,start,end,subject_code,teacher_email,groups,room,type,notes
+  2026-10-12,08:30,10:00,BDD,amira.bensalah@campuslink.local,4TWIN1|4TWIN2,Amphi A,LECTURE,
+  ```
+
+  `date` `YYYY-MM-DD` and `start`/`end` `HH:mm` are campus times; `groups` are group names separated by `|`;
+  `room` (room name), `type` (default LECTURE) and `notes` are optional. All-or-nothing: valid →
+  `200 { dryRun, created, rows }` (`created: 0` with `dryRun`); otherwise `422 IMPORT_INVALID` with
+  `details: { errors: [{ line, code, message, column? }], conflicts: [{ line, sessionId, reason, ... }], rows }`
+  (`line` = line in the file, header = 1). Error codes: `INVALID_ENCODING`, `CSV_PARSE_ERROR`, `EMPTY_FILE`,
+  `TOO_MANY_ROWS`, `MISSING_COLUMNS`, `UNKNOWN_COLUMNS`, `DUPLICATE_COLUMNS`, `TOO_MANY_VALUES`, `MISSING_VALUE`,
+  `INVALID_DATE`, `INVALID_TIME`, `INVALID_TIME_RANGE`, `UNKNOWN_SUBJECT`, `UNKNOWN_TEACHER`, `NOT_A_TEACHER`,
+  `UNKNOWN_GROUP`, `TOO_MANY_GROUPS`, `UNKNOWN_ROOM`, `INVALID_TYPE`, `NOTES_TOO_LONG`. Conflicts are reported
+  against existing sessions and between rows of the file (`otherLine`).
+- **ICS feed**: `GET /me/calendar-link` → `{ url: "<PUBLIC_API_URL>/api/timetable/ics/<token>.ics" }`, stable
+  until reset. `<token>` = `base64url(user id, 12 bytes)` + `.` + `base64url(HMAC-SHA256(JWT_SECRET,
+  "<userId>:<calendarNonce>"))`; only the random nonce is stored (`select: false`) and the token is checked with
+  `timingSafeEqual`. `POST /me/calendar-link/reset` replaces the nonce (old URL → 404, audited as
+  `timetable.calendar_link.reset`). Changing `JWT_SECRET` changes every URL. Accounts that still hold a clear-text
+  `calendarToken` from before get a nonce (and lose that field) on their next calendar-link call; their old URL
+  answers 404. The feed (RFC 5545, UTC times, `UID:<sessionId>@campuslink`, `SEQUENCE` bumped on each change,
+  `STATUS:CANCELLED` for cancelled sessions, `REFRESH-INTERVAL` 1 h, titles in the user's locale) holds the user's
+  sessions from 30 days ago to 120 days ahead. Unknown, malformed or reset token → `404 RESOURCE_NOT_FOUND`.
+
+## Announcements module — `/api/announcements` (Module 7)
+
+Code: `models/announcementModel.js`, `models/announcementReadModel.js`, `controllers/announcementController.js`,
+`service/announcementService.js` (visibility, teacher rule, publication, scheduler, stats), `service/audienceService.js`.
+
+| Endpoint | Who | Answer |
+| -------- | --- | ------ |
+| `GET /?page&limit&unread=true&priority=HIGH,URGENT` | any | `{ items, total, page, limit, unreadCount }`: PUBLISHED announcements the user receives, newest first, each with `read` |
+| `GET /:id` | recipients, author, admins | announcement (+ `read` / `stats`); others `404 RESOURCE_NOT_FOUND` |
+| `POST /:id/read` | any | `204`, idempotent (only recipients' reads are stored) |
+| `GET /:id/attachments/:attachmentId` | same as `GET /:id` | file, `Content-Disposition: attachment` with the UTF-8 name |
+| `GET /manage?status&page&limit` | ADMIN, TEACHER | own announcements (ADMIN: all) with `stats` |
+| `POST /` | ADMIN, TEACHER | `201` announcement |
+| `PATCH /:id` | author, ADMIN | `200` announcement |
+| `POST /:id/publish` | author, ADMIN | DRAFT/SCHEDULED → PUBLISHED now, else `409 INVALID_STATE` |
+| `DELETE /:id` | author, ADMIN | `204`; deletes files, reads and the related notifications |
+| `GET /:id/stats` | author, ADMIN | `{ recipients, reads, readRate, readsByDay: [{ date, count }] }` |
+| `POST /audience-preview` `{ audience }` | ADMIN, TEACHER | `{ recipients }` (same teacher rule) |
+
+- **Body** (JSON, or multipart with a `data` field holding the JSON): `{ title (1..200), body (1..10000, plain
+  text), priority: LOW | NORMAL | HIGH | URGENT, audience, action: "draft" | "publish" | "schedule", publishAt? }`;
+  `schedule` needs `publishAt` ≥ now + 1 min. `PATCH` takes the same fields plus `removeAttachments: [id]`:
+  DRAFT/SCHEDULED can change anything; PUBLISHED only `title`, `body` and `priority` (no new notification),
+  anything else → `409 INVALID_STATE`.
+- **Audience** `{ roles, programs, levels, groups }`: a user receives the announcement when every non-empty
+  criterion matches (role ∈ roles AND group.program ∈ programs AND group.level ∈ levels AND group ∈ groups); an
+  empty audience is everyone; program/level/group criteria only match users with a group. ADMIN may address
+  anyone. A TEACHER needs a non-empty `groups` list of groups they teach (SCHEDULED sessions of the current
+  academic year, see the timetable module) and `roles` empty or `["STUDENT"]`, else `403 AUDIENCE_NOT_ALLOWED`
+  (`details.reason`: `ROLES_NOT_ALLOWED` | `GROUPS_REQUIRED` | `GROUP_NOT_TAUGHT`); other roles `403 FORBIDDEN`.
+- **Attachments**: up to 5 per announcement (multipart field `attachments`), each ≤ `MAX_UPLOAD_MB` (10): pdf, png,
+  jpg/jpeg, webp, docx, xlsx, pptx, txt; MIME type, extension and content (magic bytes) must match. Errors:
+  `413 FILE_TOO_LARGE`, `415 UNSUPPORTED_FILE_TYPE`, `400 TOO_MANY_FILES`. Files are saved through
+  `storageService` under `STORAGE_DIR/announcements/` and keep their original (UTF-8) name for downloads.
+- **Publication**: publishing (now, `POST /:id/publish` or the scheduler) is claimed atomically, snapshots
+  `recipients`, records `announcement.publish` and notifies every recipient except the author (`ANNOUNCEMENT`,
+  link `/dashboard/announcements/<id>`, title prefixed `[Urgent]` / `[Important]` for URGENT / HIGH, push urgency
+  from the priority), in the background for HTTP requests.
+- **Scheduler**: job `announcements.publish-due` every `SCHEDULER_INTERVAL_MS` (30 s) publishes the due SCHEDULED
+  announcements (at most 50 per run), each claimed with `findOneAndUpdate`, so several backend instances never
+  publish or notify twice.
+- **Stats**: PUBLISHED → `recipients` snapshotted at publish time, `reads` = AnnouncementRead count, `readRate` =
+  reads / recipients (0..1); DRAFT/SCHEDULED → `recipients` = users matching the audience now, no reads.
+  `readsByDay` lists every day (campus timezone) from the publication day to today, zeros included (at most 400 days).
+
 ## Internal services for modules
 
 All paths are relative to `backend/`.
@@ -67,12 +209,16 @@ router.post('/', requireAuth, requireRole('ADMIN', 'TEACHER'), handler);   // 40
 
 `req.user` is the full User document (role read from the database). Its `group` is **populated**:
 `req.user.group = { _id, name, level, academicYear, program: { _id, name, code } } | null`.
-`middleware/optionalAuth.js` sets `req.user` when a valid token is present and continues anonymously otherwise.
+`req.sessionId` is the login session of the access token (its `sid` claim, see "Sessions" below), or `null`
+for a token issued before sessions had ids (such tokens keep working until they expire).
+`middleware/optionalAuth.js` sets `req.user` (and `req.sessionId`) when a valid token is present and continues
+anonymously otherwise.
 
 ### User model — `models/userModel.js`
 
 Fields added in phase 1: `locale` (`'fr' | 'en'`, default `'fr'`), `group` (ObjectId → Group, students only),
-`calendarToken` (`select: false`, unique when set; clear it with `$unset`, not `null`).
+`calendarNonce` (`select: false`: random secret of the ICS feed URL, see the timetable module below; the URL
+token itself is never stored).
 
 - Every `User.find*()` query populates `group` (+ its program) automatically, so serialized users have the
   public shape. It is skipped when the projection excludes `group` (`.select('firstname lastname')`,
@@ -90,7 +236,9 @@ Group names are unique per academic year and room names are unique, both ignorin
 `.collation(Group.NAME_COLLATION)` / `.collation(Room.NAME_COLLATION)` for case-insensitive lookups (CSV import).
 
 `DELETE /api/academic/...` answers `409 IN_USE` with `details.references` = counts of what still points to the
-resource: `{ groups?, users?, sessions?, announcements? }`. Sessions are counted through
+resource: `{ groups?, users?, sessions?, announcements? }`. `DELETE /api/users/:id` does the same for a TEACHER
+who still has SCHEDULED sessions that have not ended: `409 IN_USE`, `details.references.sessions` (reassign or
+cancel them first; past and cancelled sessions do not block). Sessions are counted through
 `mongoose.models.ClassSession` (`subject`, `room`, `groups` fields) and announcements through
 `mongoose.models.Announcement` (`audience.programs`, `audience.groups`) when those models are registered.
 
@@ -146,6 +294,12 @@ All of them never throw and resolve to `{ sent, outbox, removed, skipped, failed
 appended as `{ userId, subscriptionId, type, endpoint, payload, sentAt }` instead of being sent.
 Normally you only call `notificationService.notifyUsers`, which pushes for you.
 
+Each subscription belongs to the login session that registered it (`sessionId` = the access token's `sid`, `null`
+for an old token without one). Logout (revoking that session's refresh token) deletes the session's subscriptions,
+`tokenService.revokeAllRefreshTokens(userId)` (password change or reset, admin password change, account deletion)
+deletes all of the user's, and the hourly job `push.prune-ended-sessions` deletes those whose session expired.
+A user keeps at most 10 subscriptions: registering an 11th drops the least recently updated one.
+
 Web push endpoints are restricted to the browser push services (`utils/pushEndpoint.js`): `https://` with no
 port and no credentials, host `fcm.googleapis.com` or a subdomain of `push.services.mozilla.com`,
 `notify.windows.com` or `push.apple.com`. `POST /api/push/subscriptions` refuses anything else with
@@ -199,6 +353,8 @@ await storageService.remove(key);                                  // idempotent
   (unexpected file field, malformed multipart).
 - Files live under `STORAGE_DIR` (default `backend/uploads`, git-ignored) with generated names; store the `key`
   and the original `filename` in your model. Keys are validated (no path traversal).
+- `file.originalname` is UTF-8 (`defParamCharset: 'utf8'`): `filename="été.pdf"` sent as raw UTF-8 bytes, as
+  browsers do, is kept as is (multer's default would read it as latin1).
 
 ### Scheduler — `service/scheduler.js`
 
@@ -232,7 +388,8 @@ Jobs never run when `app.js` is only imported (`require('./app')`), e.g. by scri
 `formatLocalDate(date)` → `'YYYY-MM-DD'`, `formatLocalTime(date)` → `'HH:mm'`, `startOfLocalDay(date)`,
 `startOfLocalWeek(date)` (Monday 00:00), `addLocalDays(date, n)`, `addDaysToDateString('2026-10-08', 7)`,
 `isSameLocalDay(a, b)`, `getZonedParts(date)` (`weekday` 1 = Monday), `parseDateOnly`, `parseTimeOnly`,
-`currentAcademicYear()` (`'2026-2027'`, starts in September). All take an optional timezone last.
+`currentAcademicYear()` (`'2026-2027'`, starts in September), `academicYearBounds(date)` → `{ start, end }`
+(1 September 00:00 of that academic year and of the next one, end exclusive). All take an optional timezone last.
 
 ### Other helpers
 
