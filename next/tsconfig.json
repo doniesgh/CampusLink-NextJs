@@ -24,21 +24,19 @@
     ],
     "paths": {
       "@/*": [
-        "../next/*"
+        "./*"
       ]
     }
   },
   "include": [
-    "../next/next-env.d.ts",
-    "../next/**/*.ts",
-    "../next/**/*.tsx",
-    "../next/.next/types/**/*.ts",
-    "../next/.next/dev/types/**/*.ts",
-    "../next/**/*.mts",
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
   ],
   "exclude": [
-    "../next/node_modules"
+    "node_modules"
   ]
 }

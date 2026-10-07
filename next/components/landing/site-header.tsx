@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -12,19 +12,18 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { BookOpen, ChevronRight, GraduationCap, Home, Menu, Sparkles } from "lucide-react";
+import { ChevronRight, Home, LayoutGrid, Menu, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "../ui/logo";
 
 const menuItems = [
   { title: "Home", href: "/", icon: Home },
-  { title: "Features", href: "/features", icon: Sparkles },
-  { title: "Learn", href: "/learn", icon: BookOpen },
-  { title: "Academy", href: "/academy", icon: GraduationCap },
+  { title: "Modules", href: "/#modules", icon: LayoutGrid },
+  { title: "Offline mode", href: "/#offline", icon: WifiOff },
 ];
 
 const signUpClass =
-  "rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 transition-shadow hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-600/40";
+  "rounded-full shadow-lg shadow-highlight/30 transition-shadow hover:shadow-highlight/40";
 
 export default function SiteHeader() {
   const [open, setOpen] = React.useState(false);
@@ -38,8 +37,8 @@ export default function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  // Only "Home" maps to a real pathname; the other entries are in-page anchors.
+  const isActive = (href: string) => !href.includes("#") && pathname === href;
 
   return (
     <header
@@ -53,7 +52,7 @@ export default function SiteHeader() {
         className={cn(
           "mx-auto flex items-center transition-all duration-300",
           scrolled
-            ? "h-14 max-w-5xl rounded-full border border-blue-100 bg-white/80 px-4 shadow-lg shadow-blue-600/10 backdrop-blur-xl dark:border-blue-900 dark:bg-blue-950/70"
+            ? "h-14 max-w-5xl rounded-full border border-border bg-background/80 px-4 shadow-lg shadow-primary/10 backdrop-blur-xl"
             : "container h-16"
         )}
       >
@@ -71,10 +70,10 @@ export default function SiteHeader() {
                     aria-current={active ? "page" : undefined}
                     className={cn(
                       "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       active
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                        : "text-muted-foreground hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/50 dark:hover:text-blue-200"
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
                   >
                     {item.title}
@@ -87,13 +86,21 @@ export default function SiteHeader() {
 
         {/* Desktop actions */}
         <div className="ml-4 hidden items-center gap-2 md:flex">
-          <Button
-            variant="ghost"
-            className="rounded-full text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-200 dark:hover:bg-blue-900/50"
+          <Link
+            href="/login"
+            className={cn(
+              buttonVariants({ variant: "ghost" }),
+              "rounded-full text-primary hover:bg-accent hover:text-accent-foreground"
+            )}
           >
             Log in
-          </Button>
-          <Button className={cn(signUpClass, "px-5")}>Sign up</Button>
+          </Link>
+          <Link
+            href="/signup"
+            className={cn(buttonVariants({ variant: "highlight" }), signUpClass, "px-5")}
+          >
+            Sign up
+          </Link>
         </div>
 
         {/* Mobile menu */}
@@ -103,16 +110,16 @@ export default function SiteHeader() {
               variant="outline"
               size="icon"
               aria-label="Open menu"
-              className="rounded-full border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-200"
+              className="rounded-full border-border text-primary"
             >
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
 
-          <SheetContent className="flex w-[300px] flex-col p-0 sm:w-[380px] [&>button]:text-white">
-            <SheetHeader className="bg-gradient-to-br from-blue-600 to-indigo-700 px-6 py-6 text-left text-white">
-              <SheetTitle className="text-xl font-bold text-white">CampusLink</SheetTitle>
-              <SheetDescription className="text-blue-100">
+          <SheetContent className="flex w-[300px] flex-col p-0 sm:w-[380px] [&>button]:text-brand-foreground">
+            <SheetHeader className="bg-brand px-6 py-6 text-left text-brand-foreground">
+              <SheetTitle className="text-xl font-bold text-brand-foreground">CampusLink</SheetTitle>
+              <SheetDescription className="text-brand-muted-foreground">
                 Your whole campus in one app
               </SheetDescription>
             </SheetHeader>
@@ -129,16 +136,14 @@ export default function SiteHeader() {
                         aria-current={active ? "page" : undefined}
                         className={cn(
                           "flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium transition-colors",
-                          active
-                            ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200"
-                            : "hover:bg-muted"
+                          active ? "bg-accent text-accent-foreground" : "hover:bg-muted"
                         )}
                       >
                         <span
                           className={cn(
                             "flex h-9 w-9 items-center justify-center rounded-lg",
                             active
-                              ? "bg-blue-600 text-white"
+                              ? "bg-primary text-primary-foreground"
                               : "bg-muted text-muted-foreground"
                           )}
                         >
@@ -154,21 +159,23 @@ export default function SiteHeader() {
             </nav>
 
             <div className="space-y-3 border-t px-6 py-5">
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full rounded-full border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-200"
+              <Link
+                href="/login"
                 onClick={() => setOpen(false)}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "lg" }),
+                  "w-full rounded-full text-primary"
+                )}
               >
                 Log in
-              </Button>
-              <Button
-                size="lg"
-                className={cn(signUpClass, "w-full")}
+              </Link>
+              <Link
+                href="/signup"
                 onClick={() => setOpen(false)}
+                className={cn(buttonVariants({ variant: "highlight", size: "lg" }), signUpClass, "w-full")}
               >
                 Sign up
-              </Button>
+              </Link>
             </div>
           </SheetContent>
         </Sheet>

@@ -1,42 +1,159 @@
 @import "tailwindcss";
 
+/*
+ * CampusLink design tokens, from the design charter in the spec:
+ *   primary indigo #253C6D (header, main buttons, links)
+ *   accent / call-to-action coral #F2842F, exposed as --highlight because
+ *     shadcn's --accent is the subtle hover surface used by outline/ghost buttons.
+ *     Text on coral must stay dark (#1F2937); white on coral fails WCAG AA (2.6:1).
+ *   success: accessible mint green (the spec's "#30497D" is a blue, most likely a typo)
+ *   text #1F2937, secondary text ~#6B7280, light surface #F3F4F6, white background.
+ *
+ * --brand is the deep indigo used for large branded panels (auth side panel,
+ * featured cards, CTA). It stays dark in dark mode, whereas --primary becomes a
+ * lighter indigo there so links and buttons keep AA contrast on the dark background.
+ *
+ * All text/background pairs below are at least 4.5:1, and borders on inputs are at least 3:1.
+ */
 :root {
+  --radius: 0.75rem;
+
   --background: #ffffff;
-  --foreground: #171717;
-    --primary: 221 83% 53%;
-  --primary-foreground: 0 0% 100%;
-  --ring: 221 83% 53%;
-  --accent: 214 95% 95%;
-  --accent-foreground: 224 76% 33%;
-  --muted: 214 45% 96%;
-  --border: 214 32% 90%;
+  --foreground: #1f2937;
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+  --popover: #ffffff;
+  --popover-foreground: #1f2937;
+
+  --primary: #253c6d;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #1f2937;
+  /* #6B7280 from the charter is 4.39:1 on #F3F4F6; this slightly darker grey passes AA on every surface. */
+  --muted: #f3f4f6;
+  --muted-foreground: #666d7a;
+  --accent: #eef1f8;
+  --accent-foreground: #253c6d;
+
+  --highlight: #f2842f;
+  --highlight-foreground: #1f2937;
+  --success: #0f7b5b;
+  --success-foreground: #ffffff;
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+
+  --brand: #253c6d;
+  --brand-foreground: #ffffff;
+  --brand-muted-foreground: #c9d3ea;
+
+  --border: #e5e7eb;
+  --input: #8c94a3;
+  --ring: #253c6d;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0e1424;
+    --foreground: #f3f4f6;
+    --card: #161e33;
+    --card-foreground: #f3f4f6;
+    --popover: #161e33;
+    --popover-foreground: #f3f4f6;
+
+    --primary: #9db2e6;
+    --primary-foreground: #0e1424;
+    --secondary: #1e2740;
+    --secondary-foreground: #f3f4f6;
+    --muted: #1e2740;
+    --muted-foreground: #a3abba;
+    --accent: #232d4a;
+    --accent-foreground: #dce3f5;
+
+    --highlight: #f2842f;
+    --highlight-foreground: #1f2937;
+    --success: #4ade9f;
+    --success-foreground: #0e1424;
+    --destructive: #f87171;
+    --destructive-foreground: #0e1424;
+
+    --brand: #1d3160;
+    --brand-foreground: #ffffff;
+    --brand-muted-foreground: #c9d3ea;
+
+    --border: #273150;
+    --input: #5b6684;
+    --ring: #9db2e6;
+
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-poppins);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-muted-foreground: var(--brand-muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* next/font exposes --font-inter and --font-poppins on <html> (see app/layout.tsx). */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-poppins), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
 }
 
-.dark {
-  --primary: 217 91% 60%;
-  --primary-foreground: 224 71% 10%;
-  --ring: 217 91% 60%;
-  --accent: 222 47% 16%;
-  --accent-foreground: 213 97% 87%;
-  --muted: 222 40% 14%;
-  --border: 222 30% 20%;
-}
- 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Tailwind v4's container is neither centered nor padded by default. */
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1rem;
+
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Poppins, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }

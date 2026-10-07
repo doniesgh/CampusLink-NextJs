@@ -13,14 +13,14 @@ const modules = [
   { icon: BarChart3, title: "Your progress", text: "Track attendance and follow your progress in simple charts.", span: "md:col-span-3", bars: true },
   { icon: Megaphone, title: "Announcements", text: "Admins send push notifications targeted by program.", span: "md:col-span-2" },
   { icon: WifiOff, title: "Full offline mode", text: "Cached pages and background sync keep you going without signal.", span: "md:col-span-2" },
-  { icon: ShieldCheck, title: "Sign-in and roles", text: "Single sign-on with separate access for students, teachers and admins.", span: "md:col-span-2" },
+  { icon: ShieldCheck, title: "Sign-in and roles", text: "Secure sign-in with separate access for students, teachers, alumni and admins.", span: "md:col-span-2" },
 ];
 
 export default function Modules() {
   return (
     <section id="modules" className="container scroll-mt-20 py-20 md:py-28">
       <div className="mx-auto max-w-2xl text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-blue-950 dark:text-white sm:text-5xl">
+        <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
           Ten modules, one login
         </h2>
         <p className="mt-4 text-muted-foreground">
@@ -34,19 +34,23 @@ export default function Modules() {
             key={title}
             className={`${span} rounded-3xl border p-7 transition hover:-translate-y-1 hover:shadow-xl ${
               featured
-                ? "border-transparent bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-600/30"
-                : "bg-card hover:border-blue-300 hover:shadow-blue-600/10"
+                ? "border-transparent bg-brand text-brand-foreground shadow-lg shadow-primary/30"
+                : "bg-card text-card-foreground hover:border-primary/40 hover:shadow-primary/10"
             }`}
           >
-            <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${featured ? "bg-white/15" : "bg-blue-50 text-blue-600 dark:bg-blue-950"}`}>
-              <Icon className="h-6 w-6" />
+            <span
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                featured ? "bg-highlight text-highlight-foreground" : "bg-accent text-primary"
+              }`}
+            >
+              <Icon className="h-6 w-6" aria-hidden="true" />
             </span>
             <h3 className="mt-5 text-xl font-semibold">{title}</h3>
-            <p className={`mt-2 text-sm ${featured ? "text-blue-100" : "text-muted-foreground"}`}>{text}</p>
+            <p className={`mt-2 text-sm ${featured ? "text-brand-muted-foreground" : "text-muted-foreground"}`}>{text}</p>
             {bars && (
-              <div className="mt-6 flex h-16 items-end gap-2">
+              <div className="mt-6 flex h-16 items-end gap-2" aria-hidden="true">
                 {[40, 65, 50, 80, 95].map((h, i) => (
-                  <span key={i} style={{ height: `${h}%` }} className="w-full rounded-t-md bg-gradient-to-t from-blue-600 to-blue-400" />
+                  <span key={i} style={{ height: `${h}%` }} className="w-full rounded-t-md bg-linear-to-t from-primary to-primary/50" />
                 ))}
               </div>
             )}
