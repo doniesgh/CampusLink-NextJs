@@ -1,0 +1,58 @@
+{
+  "metaTitle": "Tableau de bord",
+  "loadError": {
+    "title": "On n'a pas pu charger ton tableau de bord",
+    "retry": "Réessayer"
+  },
+  "hero": {
+    "eyebrow": "Ton CampusLink",
+    "welcome": "Bienvenue, {name}",
+    "signedInAs": "Connecté avec {email}"
+  },
+  "account": {
+    "title": "Ton compte",
+    "role": "Rôle",
+    "group": "Groupe",
+    "noGroup": "Pas encore attribué",
+    "twoFactor": "Validation en deux étapes",
+    "memberSince": "Membre depuis"
+  },
+  "widgets": {
+    "notifications": {
+      "title": "Notifications non lues",
+      "empty": "Tu es à jour, rien de nouveau.",
+      "viewAll": "Voir toutes les notifications",
+      "error": "On n'a pas pu charger tes notifications."
+    }
+  },
+  "soon": {
+    "title": "Bientôt disponible",
+    "carpool": {
+      "title": "Covoiturage",
+      "text": "Trouve des trajets avec tes camarades près de chez toi."
+    },
+    "notes": {
+      "title": "Marché des notes",
+      "text": "Partage et note des fiches de cours."
+    },
+    "forum": {
+      "title": "Forum d'entraide",
+      "text": "Pose tes questions et réponds par matière."
+    },
+    "alumni": {
+      "title": "Réseau alumni",
+      "text": "Trouve un diplômé pour te parrainer."
+    }
+  },
+  "error": {
+    "title": "Cette page n'a pas pu s'afficher",
+    "description": "Un souci est survenu pendant le chargement. Tes données enregistrées restent sur cet appareil.",
+    "retry": "Réessayer",
+    "home": "Retour à l'accueil"
+  },
+  "notFound": {
+    "title": "Page introuvable",
+    "description": "Cette page n'existe pas ou a été déplacée.",
+    "home": "Retour à l'accueil"
+  }
+}

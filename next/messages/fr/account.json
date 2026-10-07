@@ -1,0 +1,48 @@
+{
+  "metaTitle": "Compte",
+  "title": "Compte",
+  "subtitle": "Ton profil, ta langue, ta sécurité et tes notifications.",
+  "profile": {
+    "title": "Profil",
+    "firstname": "Prénom",
+    "lastname": "Nom",
+    "email": "E-mail",
+    "role": "Rôle",
+    "group": "Groupe",
+    "noGroup": "Pas encore attribué",
+    "save": "Enregistrer le profil",
+    "saved": "Ton profil est enregistré.",
+    "groupValue": "Groupe : {group}"
+  },
+  "language": {
+    "title": "Langue",
+    "description": "CampusLink l'utilise aussi pour tes e-mails et tes notifications.",
+    "saved": "Langue mise à jour."
+  },
+  "security": {
+    "title": "Sécurité",
+    "twoFactor": "Validation en deux étapes",
+    "twoFactorDescription": "Quand elle est activée, on t'envoie un code à 6 chiffres par e-mail à chaque connexion.",
+    "twoFactorEnabled": "La validation en deux étapes est activée.",
+    "twoFactorDisabled": "La validation en deux étapes est désactivée.",
+    "passwordTitle": "Mot de passe",
+    "currentPassword": "Mot de passe actuel",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirme le nouveau mot de passe",
+    "changePassword": "Changer le mot de passe",
+    "passwordChanged": "Ton mot de passe a été changé. Tes autres appareils ont été déconnectés."
+  },
+  "push": {
+    "title": "Notifications",
+    "description": "Reçois les changements d'emploi du temps et les annonces sur cet appareil, même quand CampusLink est fermé.",
+    "enable": "Activer les notifications push",
+    "disable": "Désactiver les notifications push",
+    "enabled": "Les notifications push sont activées sur cet appareil.",
+    "disabled": "Les notifications push sont désactivées sur cet appareil.",
+    "unsupported": "Ton navigateur ne gère pas les notifications push.",
+    "unavailable": "Les notifications push ne sont pas encore disponibles sur ce serveur.",
+    "noServiceWorker": "Les notifications push ont besoin de l'appli installée. Ouvre CampusLink depuis une version de production, puis réessaie.",
+    "denied": "Les notifications sont bloquées pour CampusLink. Autorise-les dans les réglages de ton navigateur, puis réessaie.",
+    "failed": "On n'a pas pu modifier les notifications push. Réessaie."
+  }
+}

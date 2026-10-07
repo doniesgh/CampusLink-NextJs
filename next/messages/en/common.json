@@ -1,0 +1,122 @@
+{
+  "appName": "CampusLink",
+  "metadata": {
+    "description": "CampusLink is an offline-first student-life platform: timetable, carpooling, course notes, room bookings, help forum, alumni network and announcements in one installable app."
+  },
+  "logo": {
+    "home": "CampusLink home"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "fr": "Français"
+  },
+  "roles": {
+    "STUDENT": "Student",
+    "TEACHER": "Teacher",
+    "ADMIN": "Admin",
+    "ALUMNI": "Alumni"
+  },
+  "actions": {
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Confirm delete",
+    "tryAgain": "Try again",
+    "loadMore": "Load more",
+    "previous": "Previous",
+    "next": "Next",
+    "logout": "Log out",
+    "back": "Back",
+    "apply": "Apply",
+    "resetFilters": "Reset filters"
+  },
+  "nav": {
+    "label": "Main navigation",
+    "home": "Home",
+    "timetable": "Timetable",
+    "announcements": "Announcements",
+    "notifications": "Notifications",
+    "account": "Account",
+    "administration": "Administration",
+    "teaching": "Teaching",
+    "users": "Users",
+    "academic": "Academic structure",
+    "timetableManagement": "Timetable management",
+    "announcementsManagement": "Announcements management",
+    "audit": "Audit log",
+    "menu": "Menu",
+    "menuDescription": "Navigation, language and session",
+    "skipToContent": "Skip to content"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "pageOf": "Page {page} of {pages}",
+    "total": "{count, plural, =0 {No results} one {# result} other {# results}}"
+  },
+  "states": {
+    "loading": "Loading…",
+    "comingSoon": "Coming soon",
+    "on": "On",
+    "off": "Off",
+    "none": "None",
+    "new": "New"
+  },
+  "confirm": {
+    "irreversible": "This can't be undone."
+  },
+  "validation": {
+    "required": "This field is required.",
+    "emailRequired": "Enter your email.",
+    "emailInvalid": "Enter a valid email address.",
+    "passwordRequired": "Enter your password.",
+    "passwordTooShort": "Password must be at least {min} characters.",
+    "passwordsDontMatch": "Passwords don't match.",
+    "firstnameRequired": "Enter your first name.",
+    "lastnameRequired": "Enter your last name.",
+    "otpRequired": "Enter the 6-digit code we emailed you.",
+    "invalidValue": "This value isn't valid."
+  },
+  "errors": {
+    "GENERIC": "Something went wrong. Please try again.",
+    "INVALID_CREDENTIALS": "Incorrect email or password.",
+    "EMAIL_TAKEN": "An account already exists with this email.",
+    "OTP_INVALID": "That code is invalid or has expired.",
+    "OTP_TOO_MANY_ATTEMPTS": "Too many attempts. Please log in again.",
+    "RESET_TOKEN_INVALID": "This reset link is invalid or has expired.",
+    "NETWORK_ERROR": "Can't reach the server. Please try again.",
+    "OFFLINE": "You're offline. Try again when you're back online.",
+    "MISSING_FIELDS": "Please fill in all required fields.",
+    "VALIDATION_ERROR": "Please check the highlighted fields.",
+    "EMAIL_FAILED": "We couldn't send the email. Please try again in a moment.",
+    "INVALID_PASSWORD": "Your current password is incorrect.",
+    "INVALID_REFRESH_TOKEN": "Your session has expired. Please log in again.",
+    "TOKEN_EXPIRED": "Your session has expired. Please log in again.",
+    "INVALID_TOKEN": "Your session has expired. Please log in again.",
+    "AUTH_REQUIRED": "Please log in to continue.",
+    "FORBIDDEN": "You don't have access to this page.",
+    "TOO_MANY_REQUESTS": "Too many requests. Please wait a moment and try again.",
+    "INTERNAL_ERROR": "Something went wrong on our side. Please try again.",
+    "RESOURCE_NOT_FOUND": "We couldn't find what you're looking for.",
+    "NOT_FOUND": "We couldn't find what you're looking for.",
+    "USER_NOT_FOUND": "This user doesn't exist anymore.",
+    "INVALID_ID": "This link is invalid.",
+    "ALREADY_EXISTS": "This already exists.",
+    "IN_USE": "It's still in use, so it can't be deleted.",
+    "INVALID_STATE": "This isn't possible right now.",
+    "RANGE_TOO_LARGE": "The selected period is too long.",
+    "NO_CHANGES": "There's nothing to save.",
+    "CANNOT_DELETE_SELF": "You can't delete your own account.",
+    "INVALID_ROLE": "Choose a valid role.",
+    "PUSH_DISABLED": "Push notifications aren't available on this server.",
+    "SESSION_CONFLICT": "Conflict with another session.",
+    "IMPORT_INVALID": "The file has errors, so nothing was imported.",
+    "FILE_TOO_LARGE": "A file is too large.",
+    "UNSUPPORTED_FILE_TYPE": "This file type isn't supported.",
+    "TOO_MANY_FILES": "Too many files.",
+    "AUDIENCE_NOT_ALLOWED": "You can't send to this audience."
+  }
+}

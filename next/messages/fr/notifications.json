@@ -1,0 +1,17 @@
+{
+  "metaTitle": "Notifications",
+  "title": "Notifications",
+  "subtitle": "Changements d'emploi du temps, annonces et nouvelles de CampusLink.",
+  "markAllRead": "Tout marquer comme lu",
+  "markRead": "Marquer comme lu",
+  "allMarkedRead": "Toutes tes notifications sont marquées comme lues.",
+  "queued": "Enregistré sur cet appareil. Ce sera synchronisé dès que tu seras reconnecté.",
+  "empty": "Pas encore de notification. On te prévient dès que quelque chose change.",
+  "loadError": "On n'a pas pu charger tes notifications.",
+  "unread": "Non lue",
+  "types": {
+    "TIMETABLE_CHANGE": "Emploi du temps",
+    "ANNOUNCEMENT": "Annonce",
+    "SYSTEM": "CampusLink"
+  }
+}

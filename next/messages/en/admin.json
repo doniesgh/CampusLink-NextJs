@@ -1,0 +1,127 @@
+{
+  "users": {
+    "metaTitle": "Users",
+    "title": "Users",
+    "subtitle": "Create accounts, choose their role and put students in their group.",
+    "search": "Search",
+    "searchPlaceholder": "Name or email",
+    "role": "Role",
+    "allRoles": "All roles",
+    "add": "Add user",
+    "addTitle": "Add a user",
+    "editTitle": "Edit {name}",
+    "columns": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "group": "Group",
+      "actions": "Actions"
+    },
+    "form": {
+      "firstname": "First name",
+      "lastname": "Last name",
+      "email": "Email",
+      "password": "Password",
+      "passwordHint": "At least {min} characters.",
+      "passwordEditHint": "Leave empty to keep the current password.",
+      "role": "Role",
+      "group": "Group",
+      "noGroup": "No group",
+      "groupHint": "Only students belong to a group.",
+      "save": "Save"
+    },
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDeleteTitle": "Delete {name}?",
+    "confirmDeleteDescription": "This account and its sessions will be removed. This can't be undone.",
+    "confirmDelete": "Confirm delete",
+    "created": "{name} has been added.",
+    "updated": "{name} has been updated.",
+    "deleted": "{name} has been deleted.",
+    "empty": "No users match these filters.",
+    "you": "you"
+  },
+  "academic": {
+    "metaTitle": "Academic structure",
+    "title": "Academic structure",
+    "subtitle": "Programs, groups, subjects and rooms used by the timetable and the announcements.",
+    "tabs": {
+      "programs": "Programs",
+      "groups": "Groups",
+      "subjects": "Subjects",
+      "rooms": "Rooms"
+    },
+    "add": {
+      "programs": "Add program",
+      "groups": "Add group",
+      "subjects": "Add subject",
+      "rooms": "Add room"
+    },
+    "addTitle": {
+      "programs": "Add a program",
+      "groups": "Add a group",
+      "subjects": "Add a subject",
+      "rooms": "Add a room"
+    },
+    "editTitle": {
+      "programs": "Edit program",
+      "groups": "Edit group",
+      "subjects": "Edit subject",
+      "rooms": "Edit room"
+    },
+    "empty": {
+      "programs": "No programs yet.",
+      "groups": "No groups yet.",
+      "subjects": "No subjects yet.",
+      "rooms": "No rooms yet."
+    },
+    "fields": {
+      "name": "Name",
+      "code": "Code",
+      "description": "Description",
+      "program": "Program",
+      "chooseProgram": "Choose a program",
+      "level": "Level",
+      "academicYear": "Academic year",
+      "academicYearHint": "Format: 2026-2027",
+      "students": "Students",
+      "color": "Color",
+      "building": "Building",
+      "capacity": "Capacity",
+      "type": "Type",
+      "actions": "Actions"
+    },
+    "levelValue": "Level {level}",
+    "roomTypes": {
+      "CLASSROOM": "Classroom",
+      "AMPHITHEATER": "Amphitheater",
+      "LAB": "Lab",
+      "OTHER": "Other"
+    },
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDeleteTitle": "Delete “{name}”?",
+    "confirmDeleteDescription": "This can't be undone.",
+    "confirmDelete": "Confirm delete",
+    "saved": "“{name}” has been saved.",
+    "deleted": "“{name}” has been deleted.",
+    "inUse": "“{name}” is still in use, so it can't be deleted."
+  },
+  "audit": {
+    "metaTitle": "Audit log",
+    "title": "Audit log",
+    "subtitle": "Who did what, and when.",
+    "action": "Action",
+    "allActions": "All actions",
+    "columns": {
+      "date": "Date",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target",
+      "ip": "IP"
+    },
+    "system": "System",
+    "empty": "No entries match this filter."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "metaTitle": "Dashboard",
+  "loadError": {
+    "title": "We couldn't load your dashboard",
+    "retry": "Try again"
+  },
+  "hero": {
+    "eyebrow": "Your CampusLink",
+    "welcome": "Welcome, {name}",
+    "signedInAs": "Signed in as {email}"
+  },
+  "account": {
+    "title": "Your account",
+    "role": "Role",
+    "group": "Group",
+    "noGroup": "Not assigned yet",
+    "twoFactor": "Two-step verification",
+    "memberSince": "Member since"
+  },
+  "widgets": {
+    "notifications": {
+      "title": "Unread notifications",
+      "empty": "You're all caught up.",
+      "viewAll": "See all notifications",
+      "error": "We couldn't load your notifications."
+    }
+  },
+  "soon": {
+    "title": "Coming soon",
+    "carpool": {
+      "title": "Carpooling",
+      "text": "Find rides from classmates near you."
+    },
+    "notes": {
+      "title": "Notes marketplace",
+      "text": "Share and rate course notes."
+    },
+    "forum": {
+      "title": "Help forum",
+      "text": "Ask and answer by subject."
+    },
+    "alumni": {
+      "title": "Alumni network",
+      "text": "Find a graduate to mentor you."
+    }
+  },
+  "error": {
+    "title": "This page couldn't be displayed",
+    "description": "Something went wrong while loading this page. Your saved data is still on this device.",
+    "retry": "Try again",
+    "home": "Back to home"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "This page doesn't exist or has moved.",
+    "home": "Back to home"
+  }
+}

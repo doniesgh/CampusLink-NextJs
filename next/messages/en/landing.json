@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "main": "Main",
+    "mobile": "Mobile",
+    "footer": "Footer",
+    "home": "Home",
+    "modules": "Modules",
+    "offline": "Offline mode",
+    "login": "Log in",
+    "signup": "Sign up",
+    "openMenu": "Open menu",
+    "tagline": "Your whole campus in one app"
+  },
+  "hero": {
+    "badge": "Installable app, works offline",
+    "title": "Your whole campus in one app",
+    "subtitle": "Timetable, carpools, course notes, room bookings and announcements, together in one place and available even without a network.",
+    "cta": "Create your account",
+    "secondary": "See what's inside",
+    "stats": {
+      "modules": "modules",
+      "roles": "roles",
+      "offline": "readable offline"
+    },
+    "mock": {
+      "today": "Today",
+      "offline": "Offline",
+      "algorithms": "Algorithms",
+      "databases": "Databases",
+      "english": "English",
+      "moved": "Databases moved to room A04.",
+      "rides": "3 rides near you",
+      "badge": "New badge: Helper"
+    }
+  },
+  "modules": {
+    "title": "Ten modules, one login",
+    "subtitle": "Everything a school community needs day to day, in a single app.",
+    "items": {
+      "timetable": {
+        "title": "Smart timetable",
+        "text": "Generated for your program, with a push notification whenever a class or room changes."
+      },
+      "rooms": {
+        "title": "Rooms and equipment",
+        "text": "A shared calendar that catches booking conflicts before they happen."
+      },
+      "carpool": {
+        "title": "Carpooling",
+        "text": "Find rides from students near you and chat in the app."
+      },
+      "notes": {
+        "title": "Notes marketplace",
+        "text": "Upload and rate course notes. Payments are simulated."
+      },
+      "forum": {
+        "title": "Help forum",
+        "text": "Ask and answer by subject. Votes and badges surface the best replies."
+      },
+      "alumni": {
+        "title": "Alumni network",
+        "text": "Browse profiles and ask a graduate to mentor you."
+      },
+      "progress": {
+        "title": "Your progress",
+        "text": "Track attendance and follow your progress in simple charts."
+      },
+      "announcements": {
+        "title": "Announcements",
+        "text": "Admins send push notifications targeted by program."
+      },
+      "offline": {
+        "title": "Full offline mode",
+        "text": "Cached pages and background sync keep you going without signal."
+      },
+      "auth": {
+        "title": "Sign-in and roles",
+        "text": "Secure sign-in with separate access for students, teachers, alumni and admins."
+      }
+    }
+  },
+  "offline": {
+    "title": "Made for patchy campus Wi-Fi",
+    "subtitle": "CampusLink installs like a native app and keeps working when the network does not.",
+    "steps": {
+      "lose": {
+        "title": "You lose the signal",
+        "text": "Your timetable and saved pages stay readable."
+      },
+      "keep": {
+        "title": "You keep going",
+        "text": "Bookings and posts wait in a queue on your device."
+      },
+      "reconnect": {
+        "title": "You reconnect",
+        "text": "Everything syncs in the background."
+      }
+    }
+  },
+  "cta": {
+    "title": "Bring your school onto CampusLink",
+    "subtitle": "Create your account and see your timetable in a minute.",
+    "primary": "Create your account",
+    "secondary": "Log in"
+  },
+  "footer": {
+    "copyright": "© {year} CampusLink"
+  }
+}

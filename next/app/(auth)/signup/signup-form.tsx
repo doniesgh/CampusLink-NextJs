@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Mail, UserRound } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { signupAction } from "@/app/actions/auth";
 import { errorProps, FieldError, FormAlert } from "@/components/auth/form-messages";
 import { PasswordInput } from "@/components/auth/password-input";
@@ -11,11 +12,14 @@ import { SubmitButton } from "@/components/auth/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialFormState, type FieldErrors } from "@/lib/auth-state";
+import { useValidationMessages } from "@/lib/i18n/client";
 import { formText, hasErrors, MIN_PASSWORD_LENGTH, summarize, validateSignup } from "@/lib/validation";
 
 const iconClass = "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground";
 
 export default function SignupForm() {
+  const t = useTranslations("auth");
+  const translate = useValidationMessages();
   const [state, formAction, pending] = React.useActionState(signupAction, initialFormState);
   const [clientErrors, setClientErrors] = React.useState<FieldErrors | null>(null);
 
@@ -25,13 +29,15 @@ export default function SignupForm() {
 
   function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     const data = new FormData(event.currentTarget);
-    const errors = validateSignup({
-      firstname: formText(data, "firstname").trim(),
-      lastname: formText(data, "lastname").trim(),
-      email: formText(data, "email").trim(),
-      password: formText(data, "password"),
-      confirmPassword: formText(data, "confirmPassword"),
-    });
+    const errors = translate(
+      validateSignup({
+        firstname: formText(data, "firstname").trim(),
+        lastname: formText(data, "lastname").trim(),
+        email: formText(data, "email").trim(),
+        password: formText(data, "password"),
+        confirmPassword: formText(data, "confirmPassword"),
+      })
+    );
     if (hasErrors(errors)) {
       event.preventDefault();
       setClientErrors(errors);
@@ -42,15 +48,15 @@ export default function SignupForm() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold tracking-tight text-foreground">Create your account</h1>
-      <p className="mt-2 text-muted-foreground">Join CampusLink with your school email.</p>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground">{t("signup.title")}</h1>
+      <p className="mt-2 text-muted-foreground">{t("signup.subtitle")}</p>
 
       <SsoSection className="mt-8" />
 
       <form action={formAction} onSubmit={onSubmit} className="space-y-5" noValidate>
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="firstname">First name</Label>
+            <Label htmlFor="firstname">{t("fields.firstname")}</Label>
             <div className="relative">
               <UserRound className={iconClass} aria-hidden="true" />
               <Input
@@ -67,7 +73,7 @@ export default function SignupForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="lastname">Last name</Label>
+            <Label htmlFor="lastname">{t("fields.lastname")}</Label>
             <Input
               id="lastname"
               name="lastname"
@@ -82,7 +88,7 @@ export default function SignupForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t("fields.email")}</Label>
           <div className="relative">
             <Mail className={iconClass} aria-hidden="true" />
             <Input
@@ -90,7 +96,7 @@ export default function SignupForm() {
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="you@school.edu"
+              placeholder={t("fields.emailPlaceholder")}
               defaultValue={values.email ?? ""}
               required
               className="h-11 rounded-xl pl-10"
@@ -101,12 +107,12 @@ export default function SignupForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t("fields.password")}</Label>
           <PasswordInput
             id="password"
             name="password"
             autoComplete="new-password"
-            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            placeholder={t("fields.newPasswordPlaceholder", { min: MIN_PASSWORD_LENGTH })}
             minLength={MIN_PASSWORD_LENGTH}
             required
             {...errorProps("password", fieldErrors.password)}
@@ -115,12 +121,12 @@ export default function SignupForm() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <Label htmlFor="confirmPassword">{t("fields.confirmPassword")}</Label>
           <PasswordInput
             id="confirmPassword"
             name="confirmPassword"
             autoComplete="new-password"
-            placeholder="Type it again"
+            placeholder={t("fields.confirmPlaceholder")}
             required
             {...errorProps("confirmPassword", fieldErrors.confirmPassword)}
           />
@@ -129,13 +135,13 @@ export default function SignupForm() {
 
         <FormAlert key={`alert-${state.at}`} message={error} />
 
-        <SubmitButton pending={pending}>Create account</SubmitButton>
+        <SubmitButton pending={pending}>{t("signup.submit")}</SubmitButton>
       </form>
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
+        {t("signup.haveAccount")}{" "}
         <Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
-          Log in
+          {t("signup.login")}
         </Link>
       </p>
     </>

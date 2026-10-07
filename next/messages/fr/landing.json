@@ -1,0 +1,109 @@
+{
+  "nav": {
+    "main": "Principale",
+    "mobile": "Mobile",
+    "footer": "Pied de page",
+    "home": "Accueil",
+    "modules": "Modules",
+    "offline": "Mode hors ligne",
+    "login": "Se connecter",
+    "signup": "S'inscrire",
+    "openMenu": "Ouvrir le menu",
+    "tagline": "Tout ton campus dans une seule appli"
+  },
+  "hero": {
+    "badge": "Appli installable, marche hors ligne",
+    "title": "Tout ton campus dans une seule appli",
+    "subtitle": "Emploi du temps, covoiturage, notes de cours, réservation de salles et annonces : tout est au même endroit, et disponible même sans réseau.",
+    "cta": "Crée ton compte",
+    "secondary": "Découvre les modules",
+    "stats": {
+      "modules": "modules",
+      "roles": "rôles",
+      "offline": "lisible hors ligne"
+    },
+    "mock": {
+      "today": "Aujourd'hui",
+      "offline": "Hors ligne",
+      "algorithms": "Algorithmique",
+      "databases": "Bases de données",
+      "english": "Anglais",
+      "moved": "Bases de données déplacé en salle A04.",
+      "rides": "3 trajets près de chez toi",
+      "badge": "Nouveau badge : Entraide"
+    }
+  },
+  "modules": {
+    "title": "Dix modules, un seul compte",
+    "subtitle": "Tout ce dont ta communauté scolaire a besoin au quotidien, dans une seule appli.",
+    "items": {
+      "timetable": {
+        "title": "Emploi du temps intelligent",
+        "text": "Généré pour ta filière, avec une notification dès qu'un cours ou une salle change."
+      },
+      "rooms": {
+        "title": "Salles et matériel",
+        "text": "Un calendrier partagé qui repère les conflits de réservation avant qu'ils arrivent."
+      },
+      "carpool": {
+        "title": "Covoiturage",
+        "text": "Trouve des trajets avec des étudiants près de chez toi et discute dans l'appli."
+      },
+      "notes": {
+        "title": "Marché des notes",
+        "text": "Partage et note des fiches de cours. Les paiements sont simulés."
+      },
+      "forum": {
+        "title": "Forum d'entraide",
+        "text": "Pose tes questions et réponds par matière. Votes et badges font ressortir les meilleures réponses."
+      },
+      "alumni": {
+        "title": "Réseau alumni",
+        "text": "Parcours les profils et demande à un diplômé de te parrainer."
+      },
+      "progress": {
+        "title": "Ta progression",
+        "text": "Suis ton assiduité et ta progression avec des graphiques simples."
+      },
+      "announcements": {
+        "title": "Annonces",
+        "text": "L'administration envoie des notifications ciblées par filière."
+      },
+      "offline": {
+        "title": "Mode hors ligne complet",
+        "text": "Pages en cache et synchronisation en arrière-plan : tu continues même sans réseau."
+      },
+      "auth": {
+        "title": "Connexion et rôles",
+        "text": "Connexion sécurisée avec un accès dédié pour les étudiants, les enseignants, les alumni et l'administration."
+      }
+    }
+  },
+  "offline": {
+    "title": "Pensé pour le Wi-Fi capricieux du campus",
+    "subtitle": "CampusLink s'installe comme une appli native et continue de marcher quand le réseau lâche.",
+    "steps": {
+      "lose": {
+        "title": "Tu perds le réseau",
+        "text": "Ton emploi du temps et tes pages enregistrées restent lisibles."
+      },
+      "keep": {
+        "title": "Tu continues",
+        "text": "Tes actions attendent sagement sur ton appareil."
+      },
+      "reconnect": {
+        "title": "Tu te reconnectes",
+        "text": "Tout se synchronise en arrière-plan."
+      }
+    }
+  },
+  "cta": {
+    "title": "Fais entrer ton école dans CampusLink",
+    "subtitle": "Crée ton compte et découvre ton emploi du temps en une minute.",
+    "primary": "Crée ton compte",
+    "secondary": "Se connecter"
+  },
+  "footer": {
+    "copyright": "© {year} CampusLink"
+  }
+}

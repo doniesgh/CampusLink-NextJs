@@ -1,0 +1,48 @@
+{
+  "metaTitle": "Account",
+  "title": "Account",
+  "subtitle": "Your profile, language, security and notifications.",
+  "profile": {
+    "title": "Profile",
+    "firstname": "First name",
+    "lastname": "Last name",
+    "email": "Email",
+    "role": "Role",
+    "group": "Group",
+    "noGroup": "Not assigned yet",
+    "save": "Save profile",
+    "saved": "Your profile has been saved.",
+    "groupValue": "Group: {group}"
+  },
+  "language": {
+    "title": "Language",
+    "description": "CampusLink also uses it for your emails and notifications.",
+    "saved": "Language updated."
+  },
+  "security": {
+    "title": "Security",
+    "twoFactor": "Two-step verification",
+    "twoFactorDescription": "When it's on, we email you a 6-digit code each time you log in.",
+    "twoFactorEnabled": "Two-step verification is on.",
+    "twoFactorDisabled": "Two-step verification is off.",
+    "passwordTitle": "Password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "changePassword": "Change password",
+    "passwordChanged": "Your password has been changed. Your other devices have been signed out."
+  },
+  "push": {
+    "title": "Notifications",
+    "description": "Get timetable changes and announcements on this device, even when CampusLink is closed.",
+    "enable": "Enable push notifications",
+    "disable": "Disable push notifications",
+    "enabled": "Push notifications are on for this device.",
+    "disabled": "Push notifications are off for this device.",
+    "unsupported": "This browser doesn't support push notifications.",
+    "unavailable": "Push notifications aren't available on this server yet.",
+    "noServiceWorker": "Push notifications need the installed app. Open CampusLink from a production build, then try again.",
+    "denied": "Notifications are blocked for CampusLink. Allow them in your browser settings, then try again.",
+    "failed": "We couldn't change push notifications. Please try again."
+  }
+}

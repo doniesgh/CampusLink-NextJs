@@ -1,0 +1,122 @@
+{
+  "appName": "CampusLink",
+  "metadata": {
+    "description": "CampusLink, c'est toute ta vie étudiante dans une appli installable qui marche même hors ligne : emploi du temps, covoiturage, notes de cours, réservation de salles, forum d'entraide, réseau alumni et annonces."
+  },
+  "logo": {
+    "home": "Accueil CampusLink"
+  },
+  "language": {
+    "label": "Langue",
+    "en": "English",
+    "fr": "Français"
+  },
+  "roles": {
+    "STUDENT": "Étudiant",
+    "TEACHER": "Enseignant",
+    "ADMIN": "Admin",
+    "ALUMNI": "Alumni"
+  },
+  "actions": {
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirmDelete": "Confirmer la suppression",
+    "tryAgain": "Réessayer",
+    "loadMore": "Voir plus",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "logout": "Se déconnecter",
+    "back": "Retour",
+    "apply": "Appliquer",
+    "resetFilters": "Effacer les filtres"
+  },
+  "nav": {
+    "label": "Navigation principale",
+    "home": "Accueil",
+    "timetable": "Emploi du temps",
+    "announcements": "Annonces",
+    "notifications": "Notifications",
+    "account": "Compte",
+    "administration": "Administration",
+    "teaching": "Enseignement",
+    "users": "Utilisateurs",
+    "academic": "Structure académique",
+    "timetableManagement": "Gestion de l'emploi du temps",
+    "announcementsManagement": "Gestion des annonces",
+    "audit": "Journal d'audit",
+    "menu": "Menu",
+    "menuDescription": "Navigation, langue et session",
+    "skipToContent": "Aller au contenu"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "pageOf": "Page {page} sur {pages}",
+    "total": "{count, plural, =0 {Aucun résultat} one {# résultat} other {# résultats}}"
+  },
+  "states": {
+    "loading": "Chargement…",
+    "comingSoon": "Bientôt disponible",
+    "on": "Activée",
+    "off": "Désactivée",
+    "none": "Aucun",
+    "new": "Nouveau"
+  },
+  "confirm": {
+    "irreversible": "Attention, c'est définitif."
+  },
+  "validation": {
+    "required": "Ce champ est obligatoire.",
+    "emailRequired": "Saisis ton e-mail.",
+    "emailInvalid": "Saisis une adresse e-mail valide.",
+    "passwordRequired": "Saisis ton mot de passe.",
+    "passwordTooShort": "Ton mot de passe doit contenir au moins {min} caractères.",
+    "passwordsDontMatch": "Les mots de passe ne correspondent pas.",
+    "firstnameRequired": "Saisis ton prénom.",
+    "lastnameRequired": "Saisis ton nom.",
+    "otpRequired": "Saisis le code à 6 chiffres qu'on t'a envoyé par e-mail.",
+    "invalidValue": "Cette valeur n'est pas valide."
+  },
+  "errors": {
+    "GENERIC": "Oups, quelque chose s'est mal passé. Réessaie.",
+    "INVALID_CREDENTIALS": "E-mail ou mot de passe incorrect.",
+    "EMAIL_TAKEN": "Un compte existe déjà avec cet e-mail.",
+    "OTP_INVALID": "Ce code est invalide ou a expiré.",
+    "OTP_TOO_MANY_ATTEMPTS": "Trop de tentatives. Reconnecte-toi.",
+    "RESET_TOKEN_INVALID": "Ce lien de réinitialisation est invalide ou a expiré.",
+    "NETWORK_ERROR": "Impossible de joindre le serveur. Réessaie.",
+    "OFFLINE": "Tu es hors ligne. Réessaie quand tu seras reconnecté.",
+    "MISSING_FIELDS": "Remplis tous les champs obligatoires.",
+    "VALIDATION_ERROR": "Vérifie les champs signalés.",
+    "EMAIL_FAILED": "On n'a pas pu envoyer l'e-mail. Réessaie dans un instant.",
+    "INVALID_PASSWORD": "Ton mot de passe actuel est incorrect.",
+    "INVALID_REFRESH_TOKEN": "Ta session a expiré. Reconnecte-toi.",
+    "TOKEN_EXPIRED": "Ta session a expiré. Reconnecte-toi.",
+    "INVALID_TOKEN": "Ta session a expiré. Reconnecte-toi.",
+    "AUTH_REQUIRED": "Connecte-toi pour continuer.",
+    "FORBIDDEN": "Tu n'as pas accès à cette page.",
+    "TOO_MANY_REQUESTS": "Trop de tentatives. Patiente un peu, puis réessaie.",
+    "INTERNAL_ERROR": "Oups, un souci de notre côté. Réessaie.",
+    "RESOURCE_NOT_FOUND": "On n'a pas trouvé ce que tu cherches.",
+    "NOT_FOUND": "On n'a pas trouvé ce que tu cherches.",
+    "USER_NOT_FOUND": "Cet utilisateur n'existe plus.",
+    "INVALID_ID": "Ce lien n'est pas valide.",
+    "ALREADY_EXISTS": "Ça existe déjà.",
+    "IN_USE": "C'est encore utilisé, donc impossible de le supprimer.",
+    "INVALID_STATE": "Ce n'est pas possible pour le moment.",
+    "RANGE_TOO_LARGE": "La période choisie est trop longue.",
+    "NO_CHANGES": "Il n'y a rien à enregistrer.",
+    "CANNOT_DELETE_SELF": "Tu ne peux pas supprimer ton propre compte.",
+    "INVALID_ROLE": "Choisis un rôle valide.",
+    "PUSH_DISABLED": "Les notifications push ne sont pas disponibles sur ce serveur.",
+    "SESSION_CONFLICT": "Conflit avec un autre cours.",
+    "IMPORT_INVALID": "Le fichier contient des erreurs : rien n'a été importé.",
+    "FILE_TOO_LARGE": "Un fichier est trop lourd.",
+    "UNSUPPORTED_FILE_TYPE": "Ce type de fichier n'est pas accepté.",
+    "TOO_MANY_FILES": "Il y a trop de fichiers.",
+    "AUDIENCE_NOT_ALLOWED": "Tu ne peux pas envoyer à ce public."
+  }
+}

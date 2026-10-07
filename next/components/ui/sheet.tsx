@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
 
@@ -28,31 +29,41 @@ const SheetOverlay = React.forwardRef<
 ))
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
-const SheetContent = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out",
-        "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out",
-        "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
-        className
-      )}
-      {...props}
-    >
-      {children}
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </SheetPrimitive.Close>
-    </SheetPrimitive.Content>
-  </SheetPortal>
-))
+type SheetContentProps = React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content> & {
+  /** Edge the panel slides from (default "right"). */
+  side?: "left" | "right"
+}
+
+const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
+  ({ className, children, side = "right", ...props }, ref) => {
+    const t = useTranslations("common.actions")
+    return (
+      <SheetPortal>
+        <SheetOverlay />
+        <SheetPrimitive.Content
+          ref={ref}
+          className={cn(
+            "fixed z-50 gap-4 bg-background p-6 text-foreground shadow-lg transition ease-in-out",
+            "inset-y-0 h-full w-3/4 sm:max-w-sm",
+            side === "right" ? "right-0 border-l" : "left-0 border-r",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out",
+            side === "right"
+              ? "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right"
+              : "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <X className="h-4 w-4" aria-hidden="true" />
+            <span className="sr-only">{t("close")}</span>
+          </SheetPrimitive.Close>
+        </SheetPrimitive.Content>
+      </SheetPortal>
+    )
+  }
+)
 SheetContent.displayName = SheetPrimitive.Content.displayName
 
 const SheetHeader = ({

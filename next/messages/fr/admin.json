@@ -1,0 +1,127 @@
+{
+  "users": {
+    "metaTitle": "Utilisateurs",
+    "title": "Utilisateurs",
+    "subtitle": "Crée les comptes, choisis leur rôle et place les étudiants dans leur groupe.",
+    "search": "Rechercher",
+    "searchPlaceholder": "Nom ou e-mail",
+    "role": "Rôle",
+    "allRoles": "Tous les rôles",
+    "add": "Ajouter un utilisateur",
+    "addTitle": "Ajouter un utilisateur",
+    "editTitle": "Modifier {name}",
+    "columns": {
+      "name": "Nom",
+      "email": "E-mail",
+      "role": "Rôle",
+      "group": "Groupe",
+      "actions": "Actions"
+    },
+    "form": {
+      "firstname": "Prénom",
+      "lastname": "Nom",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "passwordHint": "Au moins {min} caractères.",
+      "passwordEditHint": "Laisse vide pour garder le mot de passe actuel.",
+      "role": "Rôle",
+      "group": "Groupe",
+      "noGroup": "Aucun groupe",
+      "groupHint": "Seuls les étudiants appartiennent à un groupe.",
+      "save": "Enregistrer"
+    },
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirmDeleteTitle": "Supprimer {name} ?",
+    "confirmDeleteDescription": "Ce compte et ses sessions seront supprimés. Attention, c'est définitif.",
+    "confirmDelete": "Confirmer la suppression",
+    "created": "{name} a été ajouté.",
+    "updated": "{name} a été mis à jour.",
+    "deleted": "{name} a été supprimé.",
+    "empty": "Aucun utilisateur ne correspond à ces filtres.",
+    "you": "toi"
+  },
+  "academic": {
+    "metaTitle": "Structure académique",
+    "title": "Structure académique",
+    "subtitle": "Les filières, groupes, matières et salles utilisés par l'emploi du temps et les annonces.",
+    "tabs": {
+      "programs": "Filières",
+      "groups": "Groupes",
+      "subjects": "Matières",
+      "rooms": "Salles"
+    },
+    "add": {
+      "programs": "Ajouter une filière",
+      "groups": "Ajouter un groupe",
+      "subjects": "Ajouter une matière",
+      "rooms": "Ajouter une salle"
+    },
+    "addTitle": {
+      "programs": "Ajouter une filière",
+      "groups": "Ajouter un groupe",
+      "subjects": "Ajouter une matière",
+      "rooms": "Ajouter une salle"
+    },
+    "editTitle": {
+      "programs": "Modifier la filière",
+      "groups": "Modifier le groupe",
+      "subjects": "Modifier la matière",
+      "rooms": "Modifier la salle"
+    },
+    "empty": {
+      "programs": "Aucune filière pour l'instant.",
+      "groups": "Aucun groupe pour l'instant.",
+      "subjects": "Aucune matière pour l'instant.",
+      "rooms": "Aucune salle pour l'instant."
+    },
+    "fields": {
+      "name": "Nom",
+      "code": "Code",
+      "description": "Description",
+      "program": "Filière",
+      "chooseProgram": "Choisis une filière",
+      "level": "Niveau",
+      "academicYear": "Année universitaire",
+      "academicYearHint": "Format : 2026-2027",
+      "students": "Étudiants",
+      "color": "Couleur",
+      "building": "Bâtiment",
+      "capacity": "Capacité",
+      "type": "Type",
+      "actions": "Actions"
+    },
+    "levelValue": "Niveau {level}",
+    "roomTypes": {
+      "CLASSROOM": "Salle de cours",
+      "AMPHITHEATER": "Amphithéâtre",
+      "LAB": "Labo",
+      "OTHER": "Autre"
+    },
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "confirmDeleteTitle": "Supprimer « {name} » ?",
+    "confirmDeleteDescription": "Attention, c'est définitif.",
+    "confirmDelete": "Confirmer la suppression",
+    "saved": "« {name} » est enregistré.",
+    "deleted": "« {name} » a été supprimé.",
+    "inUse": "« {name} » est encore utilisé, donc impossible de le supprimer."
+  },
+  "audit": {
+    "metaTitle": "Journal d'audit",
+    "title": "Journal d'audit",
+    "subtitle": "Qui a fait quoi, et quand.",
+    "action": "Action",
+    "allActions": "Toutes les actions",
+    "columns": {
+      "date": "Date",
+      "actor": "Auteur",
+      "action": "Action",
+      "target": "Cible",
+      "ip": "IP"
+    },
+    "system": "Système",
+    "empty": "Aucune entrée ne correspond à ce filtre."
+  }
+}

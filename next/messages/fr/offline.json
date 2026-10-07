@@ -1,0 +1,18 @@
+{
+  "banner": {
+    "offline": "Tu es hors ligne. Affichage des données enregistrées.",
+    "lastUpdated": "Dernière mise à jour : {time}",
+    "pending": "{count, plural, one {# modification} other {# modifications}} en attente de synchronisation"
+  },
+  "page": {
+    "metaTitle": "Hors ligne",
+    "title": "Tu es hors ligne",
+    "description": "CampusLink n'arrive pas à joindre le réseau pour le moment. Les pages que tu as déjà ouvertes restent disponibles, avec les données enregistrées sur cet appareil.",
+    "savedViews": "Vues enregistrées",
+    "timetable": "Mon emploi du temps",
+    "announcements": "Annonces",
+    "home": "Accueil",
+    "retry": "Réessayer",
+    "tip": "Tes modifications restent sur cet appareil et partent dès que tu es reconnecté."
+  }
+}

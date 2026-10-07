@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+# extra build folders (NEXT_DIST_DIR=.next-<name>: parallel builds, tests)
+.next-*/
 
 # production
 /build

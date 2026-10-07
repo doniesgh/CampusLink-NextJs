@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { KeyRound, Mail } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { loginAction } from "@/app/actions/auth";
 import { errorProps, FieldError, FormAlert, FormStatus } from "@/components/auth/form-messages";
 import { PasswordInput } from "@/components/auth/password-input";
@@ -11,11 +12,17 @@ import { SubmitButton } from "@/components/auth/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialLoginState, type FieldErrors } from "@/lib/auth-state";
+import { useValidationMessages } from "@/lib/i18n/client";
 import { formText, hasErrors, summarize, validateLogin } from "@/lib/validation";
 
 const linkClass = "font-semibold text-primary underline-offset-4 hover:underline";
 
-export default function LoginForm({ next, reset }: Readonly<{ next: string; reset: boolean }>) {
+export default function LoginForm({
+  next,
+  notice,
+}: Readonly<{ next: string; notice: "reset" | "passwordChanged" | null }>) {
+  const t = useTranslations("auth");
+  const translate = useValidationMessages();
   const [state, formAction, pending] = React.useActionState(loginAction, initialLoginState);
   const [clientErrors, setClientErrors] = React.useState<FieldErrors | null>(null);
 
@@ -24,7 +31,7 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
 
   function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     const data = new FormData(event.currentTarget);
-    const errors = validateLogin({ email: formText(data, "email").trim(), password: formText(data, "password") });
+    const errors = translate(validateLogin({ email: formText(data, "email").trim(), password: formText(data, "password") }));
     if (hasErrors(errors)) {
       event.preventDefault();
       setClientErrors(errors);
@@ -36,10 +43,12 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
   if (state.step === "otp") {
     return (
       <>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Log in</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">{t("login.title")}</h1>
         <p className="mt-2 text-muted-foreground">
-          We emailed a 6-digit verification code to{" "}
-          <span className="font-medium text-foreground">{state.email}</span>. It expires in 10 minutes.
+          {t.rich("login.otpIntro", {
+            email: state.email ?? "",
+            strong: (chunks) => <span className="font-medium text-foreground">{chunks}</span>,
+          })}
         </p>
 
         <form action={formAction} className="mt-8 space-y-5" noValidate>
@@ -48,7 +57,7 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
           <input type="hidden" name="next" value={next} />
 
           <div className="space-y-2">
-            <Label htmlFor="otp">Verification code</Label>
+            <Label htmlFor="otp">{t("login.otpLabel")}</Label>
             <div className="relative">
               <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input
@@ -57,7 +66,7 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
                 inputMode="numeric"
                 autoComplete="one-time-code"
                 maxLength={6}
-                placeholder="123456"
+                placeholder={t("login.otpPlaceholder")}
                 autoFocus
                 required
                 className="h-11 rounded-xl pl-10 tracking-[0.3em]"
@@ -71,16 +80,16 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
 
           {/* Both buttons carry the intent: the first one is also the default for "Enter". */}
           <SubmitButton name="intent" value="verify" pending={pending}>
-            Verify
+            {t("login.verify")}
           </SubmitButton>
           <button
             type="submit"
             name="intent"
             value="restart"
             disabled={pending}
-            className="w-full text-center text-sm font-medium text-primary underline-offset-4 hover:underline disabled:opacity-50"
+            className="w-full rounded-xl py-2 text-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
-            Use a different account
+            {t("login.differentAccount")}
           </button>
         </form>
       </>
@@ -89,10 +98,11 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
 
   return (
     <>
-      <h1 className="text-3xl font-bold tracking-tight text-foreground">Log in</h1>
-      <p className="mt-2 text-muted-foreground">Enter your details to open your CampusLink account.</p>
+      <h1 className="text-3xl font-bold tracking-tight text-foreground">{t("login.title")}</h1>
+      <p className="mt-2 text-muted-foreground">{t("login.subtitle")}</p>
 
-      {reset && <FormStatus className="mt-6" message="Your password has been reset. You can log in now." />}
+      {notice === "reset" && <FormStatus className="mt-6" message={t("login.resetDone")} />}
+      {notice === "passwordChanged" && <FormStatus className="mt-6" message={t("login.passwordChanged")} />}
 
       <SsoSection className="mt-8" />
 
@@ -100,7 +110,7 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
         <input type="hidden" name="next" value={next} />
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">{t("fields.email")}</Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -108,7 +118,7 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="you@school.edu"
+              placeholder={t("fields.emailPlaceholder")}
               defaultValue={state.values?.email ?? state.email ?? ""}
               required
               className="h-11 rounded-xl pl-10"
@@ -120,16 +130,16 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("fields.password")}</Label>
             <Link href="/forgot-password" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
-              Forgot password?
+              {t("login.forgot")}
             </Link>
           </div>
           <PasswordInput
             id="password"
             name="password"
             autoComplete="current-password"
-            placeholder="Your password"
+            placeholder={t("fields.passwordPlaceholder")}
             required
             {...errorProps("password", fieldErrors.password)}
           />
@@ -143,18 +153,18 @@ export default function LoginForm({ next, reset }: Readonly<{ next: string; rese
             defaultChecked={state.remember ?? false}
             className="h-4 w-4 rounded border-input accent-primary"
           />
-          Keep me signed in
+          {t("login.remember")}
         </label>
 
         <FormAlert key={`alert-${state.at}`} message={error} />
 
-        <SubmitButton pending={pending}>Log in</SubmitButton>
+        <SubmitButton pending={pending}>{t("login.submit")}</SubmitButton>
       </form>
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
-        New to CampusLink?{" "}
+        {t("login.newHere")}{" "}
         <Link href="/signup" className={linkClass}>
-          Create an account
+          {t("login.createAccount")}
         </Link>
       </p>
     </>

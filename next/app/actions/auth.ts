@@ -1,12 +1,21 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { after } from "next/server";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
+import {
+  isLocale,
+  localeFromAcceptLanguage,
+  LOCALE_COOKIE,
+  LOCALE_COOKIE_MAX_AGE,
+  type AppLocale,
+} from "@/i18n/config";
 import { api, toApiError, type ApiError } from "@/lib/api";
-import { fieldErrorsFrom, messageForCode, messageForError } from "@/lib/auth-messages";
 import type { FormState, LoginState } from "@/lib/auth-state";
+import { getErrorFormatter, translateValidation } from "@/lib/i18n/server";
 import { safeNextPath } from "@/lib/safe-next";
-import { clearSessionCookies, REFRESH_COOKIE, setSessionCookies } from "@/lib/session";
+import { clearSessionCookies, REFRESH_COOKIE, secureCookies, setSessionCookies } from "@/lib/session";
 import type { OtpChallenge, Session } from "@/lib/types";
 import {
   formText,
@@ -18,13 +27,12 @@ import {
   validateSignup,
 } from "@/lib/validation";
 
-const FORGOT_PASSWORD_SENT = "If an account exists for this email, we've sent a reset link.";
-
-function failure(error: ApiError, extra: Partial<FormState> = {}): FormState {
+async function failure(error: ApiError, extra: Partial<FormState> = {}): Promise<FormState> {
+  const formatter = await getErrorFormatter();
   return {
-    error: messageForError(error),
+    error: formatter.message(error),
     code: error.code,
-    fieldErrors: fieldErrorsFrom(error),
+    fieldErrors: formatter.fieldErrors(error),
     at: Date.now(),
     ...extra,
   };
@@ -32,6 +40,43 @@ function failure(error: ApiError, extra: Partial<FormState> = {}): FormState {
 
 function isOtpChallenge(body: Session | OtpChallenge): body is OtpChallenge {
   return (body as OtpChallenge).otpRequired === true;
+}
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+function setLocaleCookie(jar: CookieStore, locale: AppLocale): void {
+  jar.set(LOCALE_COOKIE, locale, {
+    path: "/",
+    maxAge: LOCALE_COOKIE_MAX_AGE,
+    sameSite: "lax",
+    secure: secureCookies(),
+    httpOnly: false,
+  });
+}
+
+/**
+ * After login the interface keeps the language the user is looking at (NEXT_LOCALE cookie, else the
+ * browser's Accept-Language); only when neither names fr/en does the account's saved locale apply.
+ * The result is stored in the cookie and saved to `user.locale` (emails and push use it).
+ */
+async function syncLocaleAfterLogin(jar: CookieStore, session: Session): Promise<void> {
+  const headerList = await headers();
+  const cookieLocale = jar.get(LOCALE_COOKIE)?.value;
+  const locale: AppLocale = isLocale(cookieLocale)
+    ? cookieLocale
+    : (localeFromAcceptLanguage(headerList.get("accept-language")) ?? (isLocale(session.user.locale) ? session.user.locale : "fr"));
+
+  setLocaleCookie(jar, locale);
+  if (session.user.locale !== locale) {
+    const forward = new Headers(headerList);
+    after(async () => {
+      try {
+        await api("/api/users/me", { method: "PATCH", body: { locale }, token: session.accessToken, forward });
+      } catch {
+        // Best effort.
+      }
+    });
+  }
 }
 
 /**
@@ -45,6 +90,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const email = formText(formData, "email").trim();
   const remember = ["on", "1", "true"].includes(formText(formData, "remember"));
   const next = safeNextPath(formText(formData, "next")) ?? "/dashboard";
+  const forward = await headers();
 
   if (intent === "restart") {
     return { step: "credentials", email, remember, values: { email } };
@@ -53,42 +99,37 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   let session: Session;
 
   if (intent === "verify") {
+    const t = await getTranslations("auth.login");
     const otp = formText(formData, "otp").replace(/\s+/g, "");
     if (!email) {
-      return { step: "credentials", error: "Your verification session has expired. Please log in again.", at: Date.now() };
+      return { step: "credentials", error: t("otpSessionExpired"), at: Date.now() };
     }
     if (!otp) {
-      return {
-        step: "otp",
-        email,
-        remember,
-        error: "Enter the 6-digit code we emailed you.",
-        fieldErrors: { otp: "Enter the 6-digit code we emailed you." },
-        at: Date.now(),
-      };
+      const message = (await translateValidation({ otp: "otpRequired" })).otp;
+      return { step: "otp", email, remember, error: message, fieldErrors: { otp: message }, at: Date.now() };
     }
     try {
-      session = await api<Session>("/api/auth/verify-otp", { body: { email, otp } });
+      session = await api<Session>("/api/auth/verify-otp", { body: { email, otp }, forward });
     } catch (e) {
       const error = toApiError(e);
       if (error.code === "OTP_TOO_MANY_ATTEMPTS") {
         // The pending code was cleared by the backend: start over.
-        return { step: "credentials", email, remember, values: { email }, ...failure(error) };
+        return { step: "credentials", email, remember, values: { email }, ...(await failure(error)) };
       }
-      return { step: "otp", email, remember, ...failure(error) };
+      return { step: "otp", email, remember, ...(await failure(error)) };
     }
   } else {
     const password = formText(formData, "password");
-    const errors = validateLogin({ email, password });
+    const errors = await translateValidation(validateLogin({ email, password }));
     if (hasErrors(errors)) {
       return { step: "credentials", email, remember, values: { email }, error: summarize(errors), fieldErrors: errors, at: Date.now() };
     }
 
     let body: Session | OtpChallenge;
     try {
-      body = await api<Session | OtpChallenge>("/api/auth/login", { body: { email, password } });
+      body = await api<Session | OtpChallenge>("/api/auth/login", { body: { email, password }, forward });
     } catch (e) {
-      return { step: "credentials", email, remember, values: { email }, ...failure(toApiError(e)) };
+      return { step: "credentials", email, remember, values: { email }, ...(await failure(toApiError(e))) };
     }
 
     if (isOtpChallenge(body)) {
@@ -97,7 +138,9 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     session = body;
   }
 
-  setSessionCookies(await cookies(), session, remember);
+  const jar = await cookies();
+  setSessionCookies(jar, session, remember);
+  await syncLocaleAfterLogin(jar, session);
   redirect(next);
 }
 
@@ -110,38 +153,43 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
   const password = formText(formData, "password");
   const confirmPassword = formText(formData, "confirmPassword");
 
-  const errors = validateSignup({ ...values, password, confirmPassword });
+  const errors = await translateValidation(validateSignup({ ...values, password, confirmPassword }));
   if (hasErrors(errors)) {
     return { error: summarize(errors), fieldErrors: errors, values, at: Date.now() };
   }
 
+  // The account is created in the language the visitor is using.
+  const locale = (await getLocale()) as AppLocale;
   let session: Session;
   try {
     // The backend always creates a STUDENT account on public signup.
-    session = await api<Session>("/api/auth/signup", { body: { ...values, password } });
+    session = await api<Session>("/api/auth/signup", { body: { ...values, password, locale }, forward: await headers() });
   } catch (e) {
     return failure(toApiError(e), { values });
   }
 
-  setSessionCookies(await cookies(), session, true);
+  const jar = await cookies();
+  setSessionCookies(jar, session, true);
+  setLocaleCookie(jar, locale);
   redirect("/dashboard");
 }
 
 export async function forgotPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = formText(formData, "email").trim();
-  const errors = validateForgotPassword({ email });
+  const errors = await translateValidation(validateForgotPassword({ email }));
   if (hasErrors(errors)) {
     return { error: summarize(errors), fieldErrors: errors, values: { email }, at: Date.now() };
   }
 
   try {
-    await api<{ message: string }>("/api/auth/forgot-password", { body: { email } });
+    await api<{ message: string }>("/api/auth/forgot-password", { body: { email }, forward: await headers() });
   } catch (e) {
     return failure(toApiError(e), { values: { email } });
   }
 
   // Same answer whether or not the account exists (no account enumeration).
-  return { success: FORGOT_PASSWORD_SENT, values: { email }, at: Date.now() };
+  const t = await getTranslations("auth.forgot");
+  return { success: t("sent"), values: { email }, at: Date.now() };
 }
 
 export async function resetPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -150,30 +198,38 @@ export async function resetPasswordAction(_prev: FormState, formData: FormData):
   const confirmPassword = formText(formData, "confirmPassword");
 
   if (!token) {
-    return { error: messageForCode("RESET_TOKEN_INVALID"), code: "RESET_TOKEN_INVALID", at: Date.now() };
+    const formatter = await getErrorFormatter();
+    return { error: formatter.forCode("RESET_TOKEN_INVALID"), code: "RESET_TOKEN_INVALID", at: Date.now() };
   }
-  const errors = validateResetPassword({ password, confirmPassword });
+  const errors = await translateValidation(validateResetPassword({ password, confirmPassword }));
   if (hasErrors(errors)) {
     return { error: summarize(errors), fieldErrors: errors, at: Date.now() };
   }
 
   try {
-    await api<{ message: string }>("/api/auth/reset-password", { body: { token, password } });
+    await api<{ message: string }>("/api/auth/reset-password", { body: { token, password }, forward: await headers() });
   } catch (e) {
     return failure(toApiError(e));
   }
 
-  // The backend revoked every refresh token of this user: drop any session held by this browser too.
+  // The backend revoked every refresh token of this user: drop any session held by this browser too
+  // (and, through cl_ended, the offline data it left: see clearSessionCookies).
   clearSessionCookies(await cookies());
   redirect("/login?reset=1");
 }
 
+/**
+ * Ends the session on the backend and clears the cookies. The client-side part of logout
+ * (IndexedDB, Cache Storage, push subscription) runs before, in <LogoutButton>. clearSessionCookies() also
+ * sets cl_ended, so the /login answer this redirect leads to carries `Clear-Site-Data: "cache", "storage"`
+ * (proxy.ts; Next.js copies it onto this action's answer), in case the client-side cleanup did not finish.
+ */
 export async function logoutAction(): Promise<void> {
   const jar = await cookies();
   const refreshToken = jar.get(REFRESH_COOKIE)?.value;
   if (refreshToken) {
     try {
-      await api<void>("/api/auth/logout", { body: { refreshToken } });
+      await api<void>("/api/auth/logout", { body: { refreshToken }, forward: await headers() });
     } catch {
       // Best effort: the local session is cleared either way.
     }

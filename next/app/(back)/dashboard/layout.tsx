@@ -1,27 +1,35 @@
-import { LogOut } from "lucide-react";
-import { logoutAction } from "@/app/actions/auth";
-import { SubmitButton } from "@/components/auth/submit-button";
-import Logo from "@/components/ui/logo";
+import { DataLayerProvider } from "@/components/offline/data-layer-provider";
+import { AppShell } from "@/components/shell/app-shell";
+import { getCurrentUser } from "@/lib/dal";
+import { serverSnapshot } from "@/lib/server-api";
 
-export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+/**
+ * Shell of every /dashboard page (protected by proxy.ts): navigation by role, unread badge,
+ * language switcher, logout, and the offline data layer scoped to the signed-in user.
+ */
+export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const { user } = await getCurrentUser();
+
+  if (!user) {
+    // Backend unreachable: the page itself explains the problem.
+    return (
+      <AppShell user={null} unreadCount={0}>
+        {children}
+      </AppShell>
+    );
+  }
+
+  const unread = await serverSnapshot<{ count?: number } | null>("/notifications/unread-count", null);
+
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-muted">
-      <header className="border-b bg-background">
-        <div className="container flex h-16 items-center justify-between">
-          <Logo />
-          <form action={logoutAction}>
-            <SubmitButton
-              variant="outline"
-              size="default"
-              className="h-10 w-auto rounded-full px-4 text-primary shadow-none"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-              Log out
-            </SubmitButton>
-          </form>
-        </div>
-      </header>
-      <main className="flex-1">{children}</main>
-    </div>
+    <DataLayerProvider userId={user.id}>
+      <AppShell
+        user={{ firstname: user.firstname, lastname: user.lastname, email: user.email, role: user.role }}
+        unreadCount={typeof unread.data?.count === "number" ? unread.data.count : 0}
+        renderedAt={unread.savedAt}
+      >
+        {children}
+      </AppShell>
+    </DataLayerProvider>
   );
 }

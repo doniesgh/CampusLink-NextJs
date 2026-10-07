@@ -3,6 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { ChevronRight, Home, LayoutGrid, Menu, WifiOff } from "lucide-react";
+import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Sheet,
@@ -12,23 +15,23 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ChevronRight, Home, LayoutGrid, Menu, WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "../ui/logo";
-
-const menuItems = [
-  { title: "Home", href: "/", icon: Home },
-  { title: "Modules", href: "/#modules", icon: LayoutGrid },
-  { title: "Offline mode", href: "/#offline", icon: WifiOff },
-];
 
 const signUpClass =
   "rounded-full shadow-lg shadow-highlight/30 transition-shadow hover:shadow-highlight/40";
 
 export default function SiteHeader() {
+  const t = useTranslations("landing.nav");
   const [open, setOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const pathname = usePathname();
+
+  const menuItems = [
+    { title: t("home"), href: "/", icon: Home },
+    { title: t("modules"), href: "/#modules", icon: LayoutGrid },
+    { title: t("offline"), href: "/#offline", icon: WifiOff },
+  ];
 
   React.useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -59,12 +62,12 @@ export default function SiteHeader() {
         <Logo />
 
         {/* Desktop navigation */}
-        <nav aria-label="Main" className="hidden flex-1 justify-center md:flex">
+        <nav aria-label={t("main")} className="hidden flex-1 justify-center md:flex">
           <ul className="flex items-center gap-1">
             {menuItems.map((item) => {
               const active = isActive(item.href);
               return (
-                <li key={item.title}>
+                <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
@@ -86,6 +89,7 @@ export default function SiteHeader() {
 
         {/* Desktop actions */}
         <div className="ml-4 hidden items-center gap-2 md:flex">
+          <LanguageSwitcher hideLabel selectClassName="w-30" />
           <Link
             href="/login"
             className={cn(
@@ -93,13 +97,13 @@ export default function SiteHeader() {
               "rounded-full text-primary hover:bg-accent hover:text-accent-foreground"
             )}
           >
-            Log in
+            {t("login")}
           </Link>
           <Link
             href="/signup"
             className={cn(buttonVariants({ variant: "highlight" }), signUpClass, "px-5")}
           >
-            Sign up
+            {t("signup")}
           </Link>
         </div>
 
@@ -109,27 +113,25 @@ export default function SiteHeader() {
             <Button
               variant="outline"
               size="icon"
-              aria-label="Open menu"
+              aria-label={t("openMenu")}
               className="rounded-full border-border text-primary"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-5 w-5" aria-hidden="true" />
             </Button>
           </SheetTrigger>
 
           <SheetContent className="flex w-[300px] flex-col p-0 sm:w-[380px] [&>button]:text-brand-foreground">
             <SheetHeader className="bg-brand px-6 py-6 text-left text-brand-foreground">
               <SheetTitle className="text-xl font-bold text-brand-foreground">CampusLink</SheetTitle>
-              <SheetDescription className="text-brand-muted-foreground">
-                Your whole campus in one app
-              </SheetDescription>
+              <SheetDescription className="text-brand-muted-foreground">{t("tagline")}</SheetDescription>
             </SheetHeader>
 
-            <nav aria-label="Mobile" className="flex-1 overflow-y-auto px-3 py-4">
+            <nav aria-label={t("mobile")} className="flex-1 overflow-y-auto px-3 py-4">
               <ul className="space-y-1">
                 {menuItems.map(({ title, href, icon: Icon }) => {
                   const active = isActive(href);
                   return (
-                    <li key={title}>
+                    <li key={href}>
                       <Link
                         href={href}
                         onClick={() => setOpen(false)}
@@ -147,10 +149,10 @@ export default function SiteHeader() {
                               : "bg-muted text-muted-foreground"
                           )}
                         >
-                          <Icon className="h-4 w-4" />
+                          <Icon className="h-4 w-4" aria-hidden="true" />
                         </span>
                         <span className="flex-1">{title}</span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       </Link>
                     </li>
                   );
@@ -159,6 +161,7 @@ export default function SiteHeader() {
             </nav>
 
             <div className="space-y-3 border-t px-6 py-5">
+              <LanguageSwitcher className="justify-between" />
               <Link
                 href="/login"
                 onClick={() => setOpen(false)}
@@ -167,14 +170,14 @@ export default function SiteHeader() {
                   "w-full rounded-full text-primary"
                 )}
               >
-                Log in
+                {t("login")}
               </Link>
               <Link
                 href="/signup"
                 onClick={() => setOpen(false)}
                 className={cn(buttonVariants({ variant: "highlight", size: "lg" }), signUpClass, "w-full")}
               >
-                Sign up
+                {t("signup")}
               </Link>
             </div>
           </SheetContent>

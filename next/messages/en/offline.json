@@ -1,0 +1,18 @@
+{
+  "banner": {
+    "offline": "You're offline. Showing saved data.",
+    "lastUpdated": "Last updated {time}",
+    "pending": "{count, plural, one {# change} other {# changes}} waiting to sync"
+  },
+  "page": {
+    "metaTitle": "Offline",
+    "title": "You're offline",
+    "description": "CampusLink can't reach the network right now. The pages you already opened stay available with the data saved on this device.",
+    "savedViews": "Saved views",
+    "timetable": "My timetable",
+    "announcements": "Announcements",
+    "home": "Home",
+    "retry": "Try again",
+    "tip": "Your changes stay on this device and are sent as soon as you're back online."
+  }
+}

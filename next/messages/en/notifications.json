@@ -1,0 +1,17 @@
+{
+  "metaTitle": "Notifications",
+  "title": "Notifications",
+  "subtitle": "Timetable changes, announcements and news from CampusLink.",
+  "markAllRead": "Mark all as read",
+  "markRead": "Mark as read",
+  "allMarkedRead": "All notifications are marked as read.",
+  "queued": "Saved on this device. It will sync when you're back online.",
+  "empty": "No notifications yet. We'll let you know when something changes.",
+  "loadError": "We couldn't load your notifications.",
+  "unread": "Unread",
+  "types": {
+    "TIMETABLE_CHANGE": "Timetable",
+    "ANNOUNCEMENT": "Announcement",
+    "SYSTEM": "CampusLink"
+  }
+}

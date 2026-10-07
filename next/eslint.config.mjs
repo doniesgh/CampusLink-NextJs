@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Extra build folders (NEXT_DIST_DIR=.next-<name>, parallel builds and tests).
+    ".next-*/**",
   ]),
 ]);
 

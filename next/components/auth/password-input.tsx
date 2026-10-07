@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Eye, EyeOff, Lock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,7 @@ type PasswordInputProps = Omit<React.ComponentProps<"input">, "type"> & { id: st
  * `getByLabel("Password")` only ever matches the input itself.
  */
 export function PasswordInput({ id, className, ...props }: PasswordInputProps) {
+  const t = useTranslations("auth.fields");
   const [visible, setVisible] = React.useState(false);
 
   return (
@@ -32,7 +34,7 @@ export function PasswordInput({ id, className, ...props }: PasswordInputProps) {
         className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {visible ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-        <span className="sr-only">Show password</span>
+        <span className="sr-only">{t("showPassword")}</span>
       </button>
     </div>
   );

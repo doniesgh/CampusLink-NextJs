@@ -1,5 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
+import { ConnectivityBanner } from "@/components/pwa/connectivity-banner";
+import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import "./globals.css";
 
 // Body text: Inter (variable font, covers the 400/500 weights used for copy).
@@ -17,28 +21,55 @@ const poppins = Poppins({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: {
-    template: "%s · CampusLink",
-    default: "CampusLink",
-  },
-  description:
-    "CampusLink is an offline-first student-life platform: timetable, carpooling, course notes, room bookings, help forum, alumni network and announcements in one installable app.",
-  applicationName: "CampusLink",
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("common");
+  return {
+    title: {
+      template: "%s · CampusLink",
+      default: "CampusLink",
+    },
+    description: t("metadata.description"),
+    applicationName: "CampusLink",
+    appleWebApp: { capable: true, title: "CampusLink", statusBarStyle: "default" },
+    icons: {
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      ],
+      apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
+    formatDetection: { telephone: false },
+  };
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#253C6D" },
+    { media: "(prefers-color-scheme: dark)", color: "#0E1424" },
+  ],
+  colorScheme: "light dark",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
+
   return (
     // suppressHydrationWarning: browser extensions (e.g. Office/WebDAV integrations) inject
     // attributes on <html> before React hydrates. It only covers this element's own attributes.
     <html
-      lang="en"
+      lang={locale}
       className={`${inter.variable} ${poppins.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <NextIntlClientProvider>
+          <ConnectivityBanner />
+          {children}
+          <ServiceWorkerRegistrar />
+        </NextIntlClientProvider>
+      </body>
     </html>
   );
 }
