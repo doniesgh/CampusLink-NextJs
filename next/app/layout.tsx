@@ -31,9 +31,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
+    // suppressHydrationWarning: browser extensions (e.g. Office/WebDAV integrations) inject
+    // attributes on <html> before React hydrates. It only covers this element's own attributes.
     <html
       lang="en"
       className={`${inter.variable} ${poppins.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
