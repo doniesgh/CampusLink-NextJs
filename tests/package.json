@@ -1,0 +1,22 @@
+{
+  "name": "campuslink-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright API and end-to-end tests for CampusLink (backend + Next.js web app)",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:e2e": "playwright test --project=e2e",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.5",
+    "mongodb-memory-server": "^11.3.0",
+    "typescript": "^5.9.3"
+  }
+}
