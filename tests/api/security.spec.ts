@@ -12,6 +12,8 @@ import {
   MONGO_URI,
   PUSH_OUTBOX_FILE,
   RATE_LIMIT_AUTH_MAX,
+  RATE_LIMIT_IP_MAX,
+  RATE_LIMIT_RESET_MAX,
   SECURITY_API_URL,
   STORAGE_DIR,
   TEST_VAPID,
@@ -769,6 +771,59 @@ test('POST /api/auth/login is rate limited per IP + email: 429 TOO_MANY_REQUESTS
   expect((await attempt(`  ${email.toUpperCase()} `, password)).status).toBe(429);
   // Another account is not blocked by this one.
   expect((await attempt(uniqueEmail('sec-ratelimit-other'), 'Wrong-Passw0rd!')).status).toBe(401);
+});
+
+test('the per-IP limits apply to a forwarded client address, not to loopback callers without X-Forwarded-For (the web app)', async () => {
+  // The security backend trusts loopback (TRUST_PROXY=loopback): an X-Forwarded-For sent from here is the client IP.
+  // Two documentation addresses (RFC 5737) in different ranges, fresh at every run (counters live in memory).
+  const address = `198.51.100.${1 + crypto.randomInt(254)}`;
+  const otherAddress = `203.0.113.${1 + crypto.randomInt(254)}`;
+  const from = (ip?: string): Record<string, string> => (ip ? { 'X-Forwarded-For': ip } : {});
+  // A new email each time, so the per route + IP + email limiter (RATE_LIMIT_AUTH_MAX) never answers first.
+  const badLogin = (ip?: string) =>
+    call('POST', '/api/auth/login', {
+      base: SECURITY_API_URL,
+      headers: from(ip),
+      json: { email: uniqueEmail('sec-iplimit'), password: 'Wrong-Passw0rd!' },
+    });
+  const badReset = (ip?: string) =>
+    call('POST', '/api/auth/reset-password', {
+      base: SECURITY_API_URL,
+      headers: from(ip),
+      json: { token: crypto.randomBytes(32).toString('hex'), password: 'Sec-Reset-Passw0rd!' },
+    });
+  const statuses = async (count: number, send: () => Promise<Res>) => {
+    const seen: number[] = [];
+    for (let i = 0; i < count; i += 1) seen.push((await send()).status);
+    return seen;
+  };
+
+  // login, signup, forgot-password and verify-otp share one counter per client IP, whatever the email.
+  expect(await statuses(RATE_LIMIT_IP_MAX, () => badLogin(address))).toEqual(Array(RATE_LIMIT_IP_MAX).fill(401));
+  const limited = await badLogin(address);
+  expect(limited.status, limited.text).toBe(429);
+  expect(limited.body.code).toBe('TOO_MANY_REQUESTS');
+  expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+  expect(limited.headers['ratelimit-policy']).toBe(`${RATE_LIMIT_IP_MAX};w=900`);
+  const forgot = await call('POST', '/api/auth/forgot-password', {
+    base: SECURITY_API_URL,
+    headers: from(address),
+    json: { email: uniqueEmail('sec-iplimit') },
+  });
+  expect(forgot.status, forgot.text).toBe(429);
+  // Another client is not blocked by this one.
+  expect((await badLogin(otherAddress)).status).toBe(401);
+  // Loopback without X-Forwarded-For (what Next.js sends with TRUSTED_PROXY_HOPS=0, for every web user) only has
+  // the per route + IP + email limit: one person's failed logins cannot lock every web user out.
+  expect(await statuses(RATE_LIMIT_IP_MAX + 1, () => badLogin())).toEqual(Array(RATE_LIMIT_IP_MAX + 1).fill(401));
+
+  // reset-password: per client IP, same rule for loopback.
+  expect(await statuses(RATE_LIMIT_RESET_MAX, () => badReset(address))).toEqual(Array(RATE_LIMIT_RESET_MAX).fill(400));
+  const resetLimited = await badReset(address);
+  expect(resetLimited.status, resetLimited.text).toBe(429);
+  expect(resetLimited.body.code).toBe('TOO_MANY_REQUESTS');
+  expect((await badReset(otherAddress)).status).toBe(400);
+  expect(await statuses(RATE_LIMIT_RESET_MAX + 1, () => badReset())).toEqual(Array(RATE_LIMIT_RESET_MAX + 1).fill(400));
 });
 
 // ---------------------------------------------------------------- web app (Next.js on 3100)

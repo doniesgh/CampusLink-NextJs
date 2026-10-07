@@ -17,6 +17,9 @@ export const API_URL = `http://localhost:${API_PORT}`;
 export const SECURITY_API_URL = `http://localhost:${SECURITY_API_PORT}`;
 export const WEB_URL = `http://localhost:${WEB_PORT}`;
 export const RATE_LIMIT_AUTH_MAX = 3;
+/** Per-IP limits of the security backend: above the logins the other security tests send from loopback. */
+export const RATE_LIMIT_IP_MAX = 30;
+export const RATE_LIMIT_RESET_MAX = 5;
 
 export const JWT_SECRET = 'test-secret';
 /** Lower than the production default (5) so the lockout test stays short. */

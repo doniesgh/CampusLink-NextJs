@@ -7,7 +7,8 @@ API and web UI contracts.
   checked for the contract's global rules: JSON body, `{ error, code }` on errors, and no `password`,
   OTP, reset or `stack` key anywhere.
 - `api/security.spec.ts`: short phase-1 security checks (authorization, IDOR, mass assignment, uploads,
-  NoSQL/regex injection, push endpoint SSRF, secret leaks, login rate limiting, and the web app's BFF,
+  NoSQL/regex injection, push endpoint SSRF, secret leaks, auth rate limiting (per email, and per client IP
+  only for forwarded addresses, not for loopback without `X-Forwarded-For`), and the web app's BFF,
   `?next=` redirects, security headers, client `X-Forwarded-For` (BFF and a Server Action, in a browser),
   `Clear-Site-Data` at the end of a session and the service worker's page-saving rules). A failing test there
   is a vulnerability to fix in `backend/` or `next/`, not in the test.
@@ -50,7 +51,7 @@ Development ports (3000, 4000, 27017) are never used.
 | --------------- | ----------------------------------------------- | ----------------------------------------------------------- |
 | MongoDB         | `mongodb://127.0.0.1:27018/campuslink-test`     | `scripts/test-db.mjs`; empty for every run                  |
 | Backend         | `http://localhost:4100`                         | `JWT_SECRET=test-secret`, `OTP_MAX_ATTEMPTS=3`, no SMTP, rate limiting off, push disabled |
-| Security backend| `http://localhost:4101`                         | only when `api/security.spec.ts` runs: own database, `RATE_LIMIT_AUTH_MAX=3`, test VAPID keys |
+| Security backend| `http://localhost:4101`                         | only when `api/security.spec.ts` runs: own database, `RATE_LIMIT_AUTH_MAX=3`, `RATE_LIMIT_IP_MAX=30`, `RATE_LIMIT_RESET_MAX=5`, test VAPID keys |
 | Next.js         | `http://localhost:3100`                         | `next dev`, with `API_URL=http://localhost:4100` (skipped for api-only runs without the security spec) |
 
 Environment variables passed to the backend take precedence over `backend/.env`, so your own
