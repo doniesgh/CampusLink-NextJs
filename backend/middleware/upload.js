@@ -103,6 +103,9 @@ const createUpload = ({
     const handler = multer({
       storage: multer.memoryStorage(),
       limits: { fileSize: maxBytes, files: maxCount, fields: 50, fieldSize: 1024 * 1024, parts: maxCount + 50 },
+      // Browsers and HTTP clients send `filename="été.pdf"` as raw UTF-8 bytes: read it as UTF-8, not latin1
+      // (multer's default), so accented names are kept. `filename*=UTF-8''...` is decoded either way.
+      defParamCharset: 'utf8',
       fileFilter,
     }).array(field, maxCount);
 

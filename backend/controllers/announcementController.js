@@ -153,22 +153,15 @@ const parseListQuery = (value, allowed, field) => {
 
 // ---------- Files ----------
 
-// Browsers send UTF-8 file names that multer decodes as latin1 ("Ã©" instead of "é"): re-decode them.
-const decodeFilename = (name) => {
-  const value = String(name ?? '');
-  if (!/[\u0080-ÿ]/.test(value) || /[^\u0000-ÿ]/.test(value)) return value;
-  const decoded = Buffer.from(value, 'latin1').toString('utf8');
-  return decoded.includes('�') ? value : decoded;
-};
-
 // Saves the uploaded files (req.files of the upload middleware). On failure nothing is left on disk.
+// File names are already UTF-8 (middleware/upload.js reads them with defParamCharset 'utf8').
 const saveFiles = async (files) => {
   const saved = [];
   try {
     for (const file of files) {
       const stored = await storageService.save({
         buffer: file.buffer,
-        originalName: decodeFilename(file.originalname),
+        originalName: String(file.originalname ?? ''),
         mimeType: String(file.mimetype || 'application/octet-stream').toLowerCase(),
         folder: STORAGE_FOLDER,
       });
