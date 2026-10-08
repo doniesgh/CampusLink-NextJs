@@ -1,23 +1,101 @@
+import { cache } from "react";
 import type { Metadata } from "next";
-import { Hourglass } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-import { EmptyState } from "@/components/ui/empty-state";
+import { AlumniNotFound } from "@/components/alumni/not-found-state";
+import { InlineFeedback } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { toApiError, type ApiError } from "@/lib/api";
 import { requireRole } from "@/lib/dal";
+import { getErrorFormatter } from "@/lib/i18n/server";
+import { serverApiOr, serverSnapshot, serverApi } from "@/lib/server-api";
+import { ROLES } from "@/lib/types";
+import {
+  alumniHref,
+  EMPTY_POST_FILTERS,
+  mentoringRequestPath,
+  PENDING_MENTEE_PATH,
+  PROFILE_POSTS_LIMIT,
+  postsPath,
+  profilePath,
+} from "@/lib/alumni/paths";
+import { fullName, isList, isObjectId, isProfile, type MentoringList, type MentoringRequest, type PostList, type ProfileDetail } from "@/lib/alumni/types";
+import { ProfileView } from "./profile-view";
 
-export async function generateMetadata(): Promise<Metadata> {
+type Params = Promise<{ id: string }>;
+type Loaded = { data: ProfileDetail; savedAt: number; error?: undefined } | { data?: undefined; error: ApiError };
+
+// One backend call per request, shared by generateMetadata and the page.
+const loadProfile = cache(async (id: string): Promise<Loaded> => {
+  try {
+    const data = await serverApi<ProfileDetail>(profilePath(id));
+    if (!isProfile(data) || !data.id) return { error: toApiError(new Error("Unexpected answer")) };
+    return { data, savedAt: Date.now() };
+  } catch (e) {
+    return { error: toApiError(e) };
+  }
+});
+
+const isMissing = (error: ApiError) => error.status === 404 || error.status === 400 || error.status === 403;
+
+export async function generateMetadata({ params }: Readonly<{ params: Params }>): Promise<Metadata> {
+  const { id } = await params;
   const t = await getTranslations("alumni");
-  return { title: t("profileMetaTitle") };
+  if (!isObjectId(id)) return { title: t("profileMetaTitle") };
+  const loaded = await loadProfile(id);
+  return { title: loaded.data ? fullName(loaded.data.user) || t("profileMetaTitle") : t("profileMetaTitle") };
 }
 
-/** Placeholder created by the phase 3 foundation (docs/phase3-contract.md section 5): replaced by the alumni module. */
-export default async function AlumniProfilePage() {
-  await requireRole(["STUDENT", "TEACHER", "ADMIN", "ALUMNI"], "/dashboard/alumni");
-  const t = await getTranslations("alumni");
+/** /dashboard/alumni/[id] (every role; `id` = profile id or the alumni's user id). */
+export default async function AlumniProfilePage({ params }: Readonly<{ params: Params }>) {
+  const { id } = await params;
+  const [{ user, error }, t] = await Promise.all([requireRole(ROLES), getTranslations("alumni")]);
+
+  if (!user) {
+    const errors = await getErrorFormatter();
+    return (
+      <div className="container max-w-5xl space-y-6 py-6 sm:py-10">
+        <PageHeader title={t("profileMetaTitle")} />
+        <InlineFeedback feedback={{ type: "error", message: errors.message(error) }} />
+      </div>
+    );
+  }
+
+  const loaded = isObjectId(id) ? await loadProfile(id) : null;
+  if (!loaded || (loaded.error && isMissing(loaded.error))) {
+    return (
+      <div className="container max-w-5xl py-6 sm:py-10">
+        <AlumniNotFound
+          title={t("profile.notFoundTitle")}
+          description={t("profile.notFoundText")}
+          backHref={alumniHref}
+          backLabel={t("profile.back")}
+        />
+      </div>
+    );
+  }
+
+  const profile = loaded.data ?? null;
+  const isStudent = user.role === "STUDENT";
+  const myRequest = profile?.myRequest ?? null;
+  const [pending, request, posts] = await Promise.all([
+    isStudent ? serverSnapshot<MentoringList | null>(PENDING_MENTEE_PATH, null) : Promise.resolve(null),
+    isStudent && myRequest ? serverApiOr<MentoringRequest | null>(mentoringRequestPath(myRequest.id), null) : Promise.resolve(null),
+    profile
+      ? serverSnapshot<PostList | null>(postsPath({ ...EMPTY_POST_FILTERS, author: profile.user.id }, 1, PROFILE_POSTS_LIMIT), null)
+      : Promise.resolve(null),
+  ]);
+
+  // Backend unreachable: the browser shows the copy saved on this device, if any.
   return (
-    <div className="container space-y-6 py-6 sm:py-10">
-      <PageHeader title={t("title")} description={t("description")} />
-      <EmptyState icon={Hourglass} title={t("comingSoon")} />
+    <div className="container max-w-5xl py-6 sm:py-10">
+      <ProfileView
+        id={id}
+        viewer={{ id: user.id, role: user.role }}
+        initial={profile && loaded.data ? { data: profile, savedAt: loaded.savedAt } : null}
+        initialRequest={request && typeof request.id === "string" ? request : null}
+        initialPending={pending && isList(pending.data) ? { data: pending.data as MentoringList, savedAt: pending.savedAt } : null}
+        initialPosts={posts && isList(posts.data) ? { data: posts.data as PostList, savedAt: posts.savedAt } : null}
+      />
     </div>
   );
 }
