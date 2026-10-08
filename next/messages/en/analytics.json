@@ -11,5 +11,390 @@
   "followUpMetaTitle": "Student follow-up",
   "followUpTitle": "Student follow-up",
   "followUpDescription": "Absence alerts and group overview.",
-  "comingSoon": "Coming soon."
+  "levels": {
+    "OK": "On track",
+    "WARNING": "Warning",
+    "CRITICAL": "Alert"
+  },
+  "statuses": {
+    "PRESENT": "Present",
+    "ABSENT": "Absent",
+    "LATE": "Late",
+    "EXCUSED": "Excused",
+    "none": "Not marked"
+  },
+  "assessmentTypes": {
+    "EXAM": "Exam",
+    "QUIZ": "Quiz",
+    "PROJECT": "Project",
+    "LAB": "Lab",
+    "OTHER": "Other"
+  },
+  "units": {
+    "grade": "{value}/20",
+    "score": "{score}/{max}",
+    "hours": "{value} h",
+    "noValue": "—"
+  },
+  "offline": {
+    "savedCopy": "Saved copy from {time}.",
+    "notSaved": "This page isn't saved on this device yet.",
+    "notSavedHint": "Open it once while online to read it offline.",
+    "loadError": "We couldn't load this data."
+  },
+  "student": {
+    "reportButton": "Download my report (PDF)",
+    "reportOffline": "The report needs a connection.",
+    "noGroup": "You're not assigned to a group yet.",
+    "noGroupHint": "Your attendance and grades will show here once you're in a group.",
+    "yearLine": "{group} · {program} · academic year {year}",
+    "yearLineNoProgram": "{group} · academic year {year}"
+  },
+  "overview": {
+    "figures": {
+      "label": "Key figures",
+      "attendanceRate": "Attendance rate",
+      "attendanceHint": "{absent} h missed out of {held} h",
+      "attendanceNone": "No class held yet",
+      "overall": "Overall average",
+      "overallHint": "{count, plural, =0 {No grade yet} one {# graded assessment} other {# graded assessments}}",
+      "absentHours": "Hours missed",
+      "absentHint": "{excused} h excused, not counted",
+      "late": "Late arrivals",
+      "lateHint": "Counted as present"
+    },
+    "callout": {
+      "self": {
+        "WARNING": "Keep an eye on your attendance in {subjects}.",
+        "CRITICAL": "Your absences in {subjects} are above the alert threshold. Talk to your teachers or the administration if you need help."
+      },
+      "staff": {
+        "WARNING": "Attendance to watch in {subjects}.",
+        "CRITICAL": "Absences above the alert threshold in {subjects}."
+      },
+      "thresholds": "Warning from {warning} of absences, alert from {critical}."
+    },
+    "attendance": {
+      "title": "Attendance by subject",
+      "description": {
+        "self": "Your unexcused absences out of the hours already held this year. Late arrivals count as present.",
+        "staff": "Unexcused absences out of the hours already held this year. Late arrivals count as present."
+      },
+      "empty": "No class has been held yet this year.",
+      "absenceRate": "{rate} absences",
+      "detail": "{absent} h missed out of {held} h",
+      "excused": "{hours} h excused",
+      "late": "{count, plural, one {# late arrival} other {# late arrivals}}",
+      "meterLabel": "Absence rate in {subject}",
+      "meterValue": "{rate} absences, {level}",
+      "thresholdMarks": "Marks: warning {warning}, alert {critical}"
+    },
+    "grades": {
+      "title": "Grades",
+      "description": {
+        "self": "Your published grades and weighted averages, out of 20.",
+        "staff": "Published grades and weighted averages, out of 20."
+      },
+      "bySubject": "Averages by subject",
+      "subjectAssessments": "{count, plural, =0 {No graded assessment} one {# graded assessment} other {# graded assessments}}",
+      "noAverage": "No grade yet",
+      "list": "Assessments",
+      "tableCaption": "Published assessments, newest first",
+      "columns": {
+        "assessment": "Assessment",
+        "subject": "Subject",
+        "date": "Date",
+        "score": "Score",
+        "on20": "Out of 20",
+        "coefficient": "Coef."
+      },
+      "notGraded": "Not graded",
+      "empty": {
+        "self": "No grade has been published for you yet.",
+        "staff": "No grade has been published yet."
+      },
+      "comment": "Comment: {comment}"
+    },
+    "progress": {
+      "title": "Progress",
+      "description": {
+        "self": "Your overall average after each graded assessment.",
+        "staff": "Overall average after each graded assessment."
+      },
+      "empty": "The progress chart appears once there are graded assessments.",
+      "summary": "Overall average from {first} on {from} to {last} on {to}.",
+      "summaryOne": "Overall average of {value} on {date}.",
+      "groupAverage": "Group average {value}",
+      "average": "Average",
+      "date": "Date",
+      "showTable": "Show as a table",
+      "tableCaption": "Overall average by date"
+    },
+    "activity": {
+      "title": "Activity",
+      "description": {
+        "self": "What you did on CampusLink over the last 12 weeks.",
+        "staff": "Activity on CampusLink over the last 12 weeks."
+      },
+      "forumQuestions": "Forum questions",
+      "forumAnswers": "Forum answers",
+      "announcementsRead": "Announcements read",
+      "summary": "{total, plural, =0 {No activity in the last 12 weeks.} one {# action in the last 12 weeks: {questions} questions, {answers} answers, {reads} announcements read.} other {# actions in the last 12 weeks: {questions} questions, {answers} answers, {reads} announcements read.}}",
+      "weekOf": "Week of {date}",
+      "week": "Week",
+      "total": "Total",
+      "showTable": "Show as a table",
+      "tableCaption": "Activity per week",
+      "legend": "Legend"
+    },
+    "comparison": {
+      "switch": "Compare with my group",
+      "switchStaff": "Compare with the group",
+      "hint": "Only group averages are shown, never other students' results.",
+      "loading": "Loading the group averages…",
+      "unavailable": "The comparison isn't available: it needs a group of at least {min} students.",
+      "offline": "The comparison needs a connection the first time.",
+      "error": "We couldn't load the group averages.",
+      "title": "Compared with the group",
+      "groupSize": "{count, plural, one {# student} other {# students}} in the group",
+      "you": {
+        "self": "You",
+        "staff": "Student"
+      },
+      "group": "Group average",
+      "subject": "Subject",
+      "attendance": "Attendance",
+      "average": "Average",
+      "tableCaption": "Averages compared with the group"
+    }
+  },
+  "attendance": {
+    "periodLabel": "Sessions from {from} to {to}",
+    "previous": "Previous 7 days",
+    "next": "Next 7 days",
+    "today": "Today",
+    "changePeriod": "Change period",
+    "filters": "Filters",
+    "group": "Group",
+    "allGroups": "All groups",
+    "teacher": "Teacher",
+    "allTeachers": "All teachers",
+    "empty": "No session in this period.",
+    "emptyHint": "The sessions of your timetable show up here, from the 7 last days.",
+    "loadError": "We couldn't load the sessions.",
+    "todayHeading": "Today",
+    "marked": "{marked}/{students} marked",
+    "countsLabel": "Attendance summary",
+    "absentCount": "{count} absent",
+    "lateCount": "{count} late",
+    "excusedCount": "{count} excused",
+    "states": {
+      "open": "Open",
+      "notOpen": "Opens at {time}",
+      "closed": "Closed",
+      "cancelled": "Cancelled",
+      "complete": "Done"
+    },
+    "take": "Take attendance",
+    "edit": "Edit attendance",
+    "view": "View attendance",
+    "groupsLabel": "Groups: {groups}",
+    "roomLabel": "Room {room}",
+    "noRoom": "Room to be confirmed",
+    "rollCall": {
+      "back": "Back to sessions",
+      "metaTitle": "Attendance — {subject}",
+      "when": "{date}, {time}",
+      "teacherLabel": "With {teacher}",
+      "windowOpen": "You can save until {date}.",
+      "windowNotOpen": "Attendance opens on {date} (15 minutes before the start).",
+      "windowClosed": "Attendance closed on {date} (7 days after the session).",
+      "adminAnyTime": "As an administrator, you can change it at any time and record excused absences.",
+      "cancelled": "This session was cancelled: there's no attendance to take.",
+      "rosterTitle": "Students",
+      "rosterCount": "{count, plural, =0 {No student} one {# student} other {# students}}",
+      "rosterEmpty": "No student in the groups of this session.",
+      "allPresent": "All present",
+      "allPresentHint": "Marks every student as present (excused absences are kept). Nothing is saved until you click “Save attendance”.",
+      "save": "Save attendance",
+      "saved": "{count, plural, =0 {Nothing to save: the attendance was already up to date.} one {Attendance saved (# change).} other {Attendance saved (# changes).}}",
+      "unsaved": "{count, plural, =0 {All changes saved} one {# unsaved change} other {# unsaved changes}}",
+      "clear": "Clear",
+      "clearLabel": "Clear the mark of {name}",
+      "noteLabel": "Note about {name}",
+      "notePlaceholder": "Optional, e.g. arrived at 10:15",
+      "addNote": "Add a note",
+      "excusedLocked": "Excused by the administration.",
+      "readOnly": "Read only",
+      "summary": "{marked}/{students} marked",
+      "countsLine": "{present} present · {absent} absent · {late} late · {excused} excused",
+      "notFound": "This session doesn't exist or you can't take its attendance.",
+      "errors": {
+        "ROLL_CALL_NOT_OPEN": "Attendance isn't open yet for this session (it opens 15 minutes before the start).",
+        "ROLL_CALL_CLOSED": "Attendance is closed for this session (7 days after its end).",
+        "EXCUSED_ADMIN_ONLY": "Only an administrator can record or change an excused absence.",
+        "CANCELLED": "This session was cancelled: there's no attendance to take.",
+        "NOT_IN_ROSTER": "Some students are no longer in the groups of this session. Reload the page.",
+        "offline": "You're offline: your marks aren't saved yet. Try again when you're back online."
+      }
+    }
+  },
+  "grades": {
+    "pair": "Class",
+    "pairHint": "Group and subject",
+    "teachers": "Taught by {names}",
+    "noPairs": "You don't teach any class this year.",
+    "noPairsHint": "Classes come from the timetable: a subject you teach to a group this academic year.",
+    "newAssessment": "New assessment",
+    "listTitle": "Assessments",
+    "listCount": "{count, plural, =0 {No assessment} one {# assessment} other {# assessments}}",
+    "empty": "No assessment yet for this class.",
+    "emptyHint": "Create one to start entering grades.",
+    "published": "Published",
+    "draft": "Not published",
+    "graded": "{graded}/{students} graded",
+    "classAverage": "Class average {value}",
+    "noClassAverage": "No class average yet",
+    "scale": "Out of {max} · coefficient {coefficient}",
+    "enterGrades": "Enter grades",
+    "viewGrades": "Grades",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirm": "Delete “{title}”?",
+    "deleteDescription": "Its grades are deleted too. This can't be undone.",
+    "publish": "Publish",
+    "publishConfirm": "Publish “{title}”?",
+    "publishDescription": "The students of {group} will be notified and will see their grades. You can still correct grades afterwards, but you can't unpublish.",
+    "publishConfirmLabel": "Publish grades",
+    "created": "Assessment “{title}” created.",
+    "updated": "Assessment “{title}” updated.",
+    "deleted": "Assessment “{title}” deleted.",
+    "publishedDone": "“{title}” published: the students have been notified.",
+    "form": {
+      "createTitle": "New assessment",
+      "editTitle": "Edit the assessment",
+      "description": "{group} · {subject}",
+      "title": "Title",
+      "type": "Type",
+      "date": "Date",
+      "maxScore": "Maximum score",
+      "maxScoreHint": "Usually 20.",
+      "coefficient": "Coefficient",
+      "coefficientHint": "Weight in the averages.",
+      "create": "Create assessment",
+      "save": "Save changes",
+      "errors": {
+        "title": "Enter a title (200 characters at most).",
+        "type": "Choose a type.",
+        "date": "Choose a date.",
+        "maxScore": "Enter a number greater than 0 (1000 at most).",
+        "maxScoreBelow": "Some grades are above this maximum: change them first.",
+        "coefficient": "Enter a number greater than 0 (100 at most)."
+      }
+    },
+    "sheet": {
+      "back": "Back to assessments",
+      "metaTitle": "Grades — {title}",
+      "publishedNote": "Published on {date}: students see these grades.",
+      "draftNote": "Not published yet: students don't see these grades.",
+      "student": "Student",
+      "score": "Score (out of {max})",
+      "scoreLabel": "Score of {name}, out of {max}",
+      "comment": "Comment",
+      "commentLabel": "Comment for {name}",
+      "on20": "Out of 20",
+      "save": "Save grades",
+      "saved": "{count, plural, =0 {Nothing to save: the grades were already up to date.} one {Grades saved (# change).} other {Grades saved (# changes).}}",
+      "unsaved": "{count, plural, =0 {All changes saved} one {# unsaved change} other {# unsaved changes}}",
+      "invalidScore": "Enter a number between 0 and {max}, or leave it empty.",
+      "fixErrors": "Check the highlighted scores first.",
+      "empty": "No student in this group.",
+      "notFound": "This assessment doesn't exist or you can't manage it.",
+      "tableCaption": "Grade sheet of {title}",
+      "stats": {
+        "label": "Statistics",
+        "graded": "Graded",
+        "average": "Class average",
+        "min": "Lowest",
+        "max": "Highest"
+      },
+      "errors": {
+        "offline": "You're offline: the grades aren't saved yet. Try again when you're back online."
+      },
+      "saveBeforePublish": "Save the grades before publishing."
+    },
+    "errors": {
+      "NOT_TEACHING": "You can only manage the subjects you teach to this group.",
+      "PUBLISHED": "A published assessment can only be deleted by an administrator."
+    },
+    "deletePublishedDescription": "It is already published: the students' grades will be deleted too. This action is recorded in the audit log."
+  },
+  "followUp": {
+    "tabsLabel": "Student follow-up sections",
+    "tabs": {
+      "alerts": "Alerts",
+      "groups": "Groups"
+    },
+    "alerts": {
+      "title": "Absence alerts",
+      "description": "Raised once per student, subject and level when absences cross a threshold.",
+      "group": "Group",
+      "allGroups": "All groups",
+      "level": "Level",
+      "allLevels": "All levels",
+      "subject": "Subject",
+      "allSubjects": "All subjects",
+      "empty": "No alert for these filters.",
+      "total": "{count, plural, =0 {No alert} one {# alert} other {# alerts}}",
+      "tableCaption": "Absence alerts, newest first",
+      "columns": {
+        "date": "Date",
+        "student": "Student",
+        "group": "Group",
+        "subject": "Subject",
+        "level": "Level",
+        "rate": "Rate when raised"
+      },
+      "noGroup": "No group",
+      "unknownStudent": "Deleted student"
+    },
+    "groups": {
+      "group": "Group",
+      "noGroups": "No group yet.",
+      "subject": "Subject",
+      "allSubjects": "All subjects",
+      "sort": "Sort by",
+      "sortName": "Name",
+      "sortAbsences": "Absences",
+      "sortAverage": "Average",
+      "summaryLabel": "Group summary",
+      "students": "Students",
+      "averageAttendance": "Average attendance",
+      "averageGrade": "Average grade",
+      "levelsTitle": "Attendance levels",
+      "empty": "No student in this group.",
+      "noSubjects": "No subject in this group's timetable yet.",
+      "tableCaption": "Students of {group}",
+      "columns": {
+        "student": "Student",
+        "absences": "Absences",
+        "missed": "Hours missed",
+        "late": "Late",
+        "average": "Average",
+        "level": "Level"
+      },
+      "loadError": "We couldn't load this group."
+    },
+    "student": {
+      "back": "Back to student follow-up",
+      "metaTitle": "Follow-up — {name}",
+      "report": "Download the report (PDF)",
+      "reportLanguage": "Report language",
+      "studentLanguage": "Student's language",
+      "french": "French",
+      "english": "English",
+      "notFound": "This student doesn't exist.",
+      "noGroup": "No group"
+    }
+  }
 }

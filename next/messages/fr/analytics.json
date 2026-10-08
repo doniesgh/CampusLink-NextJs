@@ -11,5 +11,390 @@
   "followUpMetaTitle": "Suivi des étudiants",
   "followUpTitle": "Suivi des étudiants",
   "followUpDescription": "Alertes d'absentéisme et vue par groupe.",
-  "comingSoon": "Bientôt disponible."
+  "levels": {
+    "OK": "Tout va bien",
+    "WARNING": "Vigilance",
+    "CRITICAL": "Alerte"
+  },
+  "statuses": {
+    "PRESENT": "Présent",
+    "ABSENT": "Absent",
+    "LATE": "En retard",
+    "EXCUSED": "Excusé",
+    "none": "Non renseigné"
+  },
+  "assessmentTypes": {
+    "EXAM": "Examen",
+    "QUIZ": "Quiz",
+    "PROJECT": "Projet",
+    "LAB": "TP",
+    "OTHER": "Autre"
+  },
+  "units": {
+    "grade": "{value}/20",
+    "score": "{score}/{max}",
+    "hours": "{value} h",
+    "noValue": "—"
+  },
+  "offline": {
+    "savedCopy": "Copie enregistrée le {time}.",
+    "notSaved": "Cette page n'est pas encore enregistrée sur cet appareil.",
+    "notSavedHint": "Ouvre-la une fois en ligne pour pouvoir la lire hors ligne.",
+    "loadError": "Impossible de charger ces données."
+  },
+  "student": {
+    "reportButton": "Télécharger mon relevé (PDF)",
+    "reportOffline": "Le relevé nécessite une connexion.",
+    "noGroup": "Tu n'es pas encore affecté à un groupe.",
+    "noGroupHint": "Ton assiduité et tes notes apparaîtront ici dès que tu seras dans un groupe.",
+    "yearLine": "{group} · {program} · année universitaire {year}",
+    "yearLineNoProgram": "{group} · année universitaire {year}"
+  },
+  "overview": {
+    "figures": {
+      "label": "Chiffres clés",
+      "attendanceRate": "Taux de présence",
+      "attendanceHint": "{absent} h manquées sur {held} h",
+      "attendanceNone": "Aucun cours encore donné",
+      "overall": "Moyenne générale",
+      "overallHint": "{count, plural, =0 {Pas encore de note} one {# évaluation notée} other {# évaluations notées}}",
+      "absentHours": "Heures manquées",
+      "absentHint": "{excused} h excusées, non comptées",
+      "late": "Retards",
+      "lateHint": "Comptés comme présents"
+    },
+    "callout": {
+      "self": {
+        "WARNING": "Fais attention à ton assiduité en {subjects}.",
+        "CRITICAL": "Tes absences en {subjects} dépassent le seuil d'alerte. N'hésite pas à en parler à tes enseignants ou à l'administration si tu as besoin d'aide."
+      },
+      "staff": {
+        "WARNING": "Assiduité à surveiller en {subjects}.",
+        "CRITICAL": "Absences au-dessus du seuil d'alerte en {subjects}."
+      },
+      "thresholds": "Vigilance à partir de {warning} d'absences, alerte à partir de {critical}."
+    },
+    "attendance": {
+      "title": "Assiduité par matière",
+      "description": {
+        "self": "Tes absences non excusées par rapport aux heures déjà données cette année. Les retards comptent comme présents.",
+        "staff": "Absences non excusées par rapport aux heures déjà données cette année. Les retards comptent comme présents."
+      },
+      "empty": "Aucun cours n'a encore eu lieu cette année.",
+      "absenceRate": "{rate} d'absences",
+      "detail": "{absent} h manquées sur {held} h",
+      "excused": "{hours} h excusées",
+      "late": "{count, plural, one {# retard} other {# retards}}",
+      "meterLabel": "Taux d'absences en {subject}",
+      "meterValue": "{rate} d'absences, {level}",
+      "thresholdMarks": "Repères : vigilance {warning}, alerte {critical}"
+    },
+    "grades": {
+      "title": "Notes",
+      "description": {
+        "self": "Tes notes publiées et tes moyennes pondérées, sur 20.",
+        "staff": "Notes publiées et moyennes pondérées, sur 20."
+      },
+      "bySubject": "Moyennes par matière",
+      "subjectAssessments": "{count, plural, =0 {Aucune évaluation notée} one {# évaluation notée} other {# évaluations notées}}",
+      "noAverage": "Pas encore de note",
+      "list": "Évaluations",
+      "tableCaption": "Évaluations publiées, des plus récentes aux plus anciennes",
+      "columns": {
+        "assessment": "Évaluation",
+        "subject": "Matière",
+        "date": "Date",
+        "score": "Note",
+        "on20": "Sur 20",
+        "coefficient": "Coef."
+      },
+      "notGraded": "Non noté",
+      "empty": {
+        "self": "Aucune note n'a encore été publiée pour toi.",
+        "staff": "Aucune note n'a encore été publiée."
+      },
+      "comment": "Commentaire : {comment}"
+    },
+    "progress": {
+      "title": "Progression",
+      "description": {
+        "self": "Ta moyenne générale après chaque évaluation notée.",
+        "staff": "Moyenne générale après chaque évaluation notée."
+      },
+      "empty": "Le graphique de progression apparaîtra dès qu'il y aura des évaluations notées.",
+      "summary": "Moyenne générale de {first} le {from} à {last} le {to}.",
+      "summaryOne": "Moyenne générale de {value} le {date}.",
+      "groupAverage": "Moyenne du groupe {value}",
+      "average": "Moyenne",
+      "date": "Date",
+      "showTable": "Afficher en tableau",
+      "tableCaption": "Moyenne générale par date"
+    },
+    "activity": {
+      "title": "Activité",
+      "description": {
+        "self": "Ce que tu as fait sur CampusLink ces 12 dernières semaines.",
+        "staff": "Activité sur CampusLink ces 12 dernières semaines."
+      },
+      "forumQuestions": "Questions sur le forum",
+      "forumAnswers": "Réponses sur le forum",
+      "announcementsRead": "Annonces lues",
+      "summary": "{total, plural, =0 {Aucune activité ces 12 dernières semaines.} one {# action ces 12 dernières semaines : {questions} questions, {answers} réponses, {reads} annonces lues.} other {# actions ces 12 dernières semaines : {questions} questions, {answers} réponses, {reads} annonces lues.}}",
+      "weekOf": "Semaine du {date}",
+      "week": "Semaine",
+      "total": "Total",
+      "showTable": "Afficher en tableau",
+      "tableCaption": "Activité par semaine",
+      "legend": "Légende"
+    },
+    "comparison": {
+      "switch": "Me comparer à mon groupe",
+      "switchStaff": "Comparer au groupe",
+      "hint": "Seules les moyennes du groupe sont affichées, jamais les résultats des autres étudiants.",
+      "loading": "Chargement des moyennes du groupe…",
+      "unavailable": "La comparaison n'est pas disponible : il faut un groupe d'au moins {min} étudiants.",
+      "offline": "La comparaison nécessite une connexion la première fois.",
+      "error": "Impossible de charger les moyennes du groupe.",
+      "title": "Comparaison avec le groupe",
+      "groupSize": "{count, plural, one {# étudiant} other {# étudiants}} dans le groupe",
+      "you": {
+        "self": "Toi",
+        "staff": "Étudiant"
+      },
+      "group": "Moyenne du groupe",
+      "subject": "Matière",
+      "attendance": "Présence",
+      "average": "Moyenne",
+      "tableCaption": "Moyennes comparées à celles du groupe"
+    }
+  },
+  "attendance": {
+    "periodLabel": "Séances du {from} au {to}",
+    "previous": "7 jours précédents",
+    "next": "7 jours suivants",
+    "today": "Aujourd'hui",
+    "changePeriod": "Changer de période",
+    "filters": "Filtres",
+    "group": "Groupe",
+    "allGroups": "Tous les groupes",
+    "teacher": "Enseignant",
+    "allTeachers": "Tous les enseignants",
+    "empty": "Aucune séance sur cette période.",
+    "emptyHint": "Les séances de ton emploi du temps apparaissent ici, sur les 7 derniers jours.",
+    "loadError": "Impossible de charger les séances.",
+    "todayHeading": "Aujourd'hui",
+    "marked": "{marked}/{students} renseignés",
+    "countsLabel": "Résumé de l'appel",
+    "absentCount": "{count} absent(s)",
+    "lateCount": "{count} en retard",
+    "excusedCount": "{count} excusé(s)",
+    "states": {
+      "open": "Ouvert",
+      "notOpen": "Ouvre à {time}",
+      "closed": "Fermé",
+      "cancelled": "Annulée",
+      "complete": "Terminé"
+    },
+    "take": "Faire l'appel",
+    "edit": "Modifier l'appel",
+    "view": "Voir l'appel",
+    "groupsLabel": "Groupes : {groups}",
+    "roomLabel": "Salle {room}",
+    "noRoom": "Salle à confirmer",
+    "rollCall": {
+      "back": "Retour aux séances",
+      "metaTitle": "Appel — {subject}",
+      "when": "{date}, {time}",
+      "teacherLabel": "Avec {teacher}",
+      "windowOpen": "Tu peux enregistrer jusqu'au {date}.",
+      "windowNotOpen": "L'appel ouvre le {date} (15 minutes avant le début).",
+      "windowClosed": "L'appel est fermé depuis le {date} (7 jours après la séance).",
+      "adminAnyTime": "En tant qu'administrateur, tu peux le modifier à tout moment et enregistrer les absences excusées.",
+      "cancelled": "Cette séance a été annulée : il n'y a pas d'appel à faire.",
+      "rosterTitle": "Étudiants",
+      "rosterCount": "{count, plural, =0 {Aucun étudiant} one {# étudiant} other {# étudiants}}",
+      "rosterEmpty": "Aucun étudiant dans les groupes de cette séance.",
+      "allPresent": "Tous présents",
+      "allPresentHint": "Marque tous les étudiants présents (les absences excusées sont conservées). Rien n'est enregistré tant que tu ne cliques pas sur « Enregistrer l'appel ».",
+      "save": "Enregistrer l'appel",
+      "saved": "{count, plural, =0 {Rien à enregistrer : l'appel était déjà à jour.} one {Appel enregistré (# modification).} other {Appel enregistré (# modifications).}}",
+      "unsaved": "{count, plural, =0 {Tout est enregistré} one {# modification non enregistrée} other {# modifications non enregistrées}}",
+      "clear": "Effacer",
+      "clearLabel": "Effacer la présence de {name}",
+      "noteLabel": "Remarque sur {name}",
+      "notePlaceholder": "Facultatif, par ex. arrivé à 10 h 15",
+      "addNote": "Ajouter une remarque",
+      "excusedLocked": "Excusé par l'administration.",
+      "readOnly": "Lecture seule",
+      "summary": "{marked}/{students} renseignés",
+      "countsLine": "{present} présents · {absent} absents · {late} en retard · {excused} excusés",
+      "notFound": "Cette séance n'existe pas ou tu ne peux pas faire son appel.",
+      "errors": {
+        "ROLL_CALL_NOT_OPEN": "L'appel n'est pas encore ouvert pour cette séance (il ouvre 15 minutes avant le début).",
+        "ROLL_CALL_CLOSED": "L'appel est fermé pour cette séance (7 jours après sa fin).",
+        "EXCUSED_ADMIN_ONLY": "Seul un administrateur peut enregistrer ou modifier une absence excusée.",
+        "CANCELLED": "Cette séance a été annulée : il n'y a pas d'appel à faire.",
+        "NOT_IN_ROSTER": "Certains étudiants ne sont plus dans les groupes de cette séance. Recharge la page.",
+        "offline": "Tu es hors ligne : l'appel n'est pas encore enregistré. Réessaie quand tu seras de nouveau en ligne."
+      }
+    }
+  },
+  "grades": {
+    "pair": "Classe",
+    "pairHint": "Groupe et matière",
+    "teachers": "Enseignée par {names}",
+    "noPairs": "Tu n'as aucune classe cette année.",
+    "noPairsHint": "Les classes viennent de l'emploi du temps : une matière que tu enseignes à un groupe cette année universitaire.",
+    "newAssessment": "Nouvelle évaluation",
+    "listTitle": "Évaluations",
+    "listCount": "{count, plural, =0 {Aucune évaluation} one {# évaluation} other {# évaluations}}",
+    "empty": "Pas encore d'évaluation pour cette classe.",
+    "emptyHint": "Crées-en une pour commencer à saisir les notes.",
+    "published": "Publiée",
+    "draft": "Non publiée",
+    "graded": "{graded}/{students} notés",
+    "classAverage": "Moyenne de la classe {value}",
+    "noClassAverage": "Pas encore de moyenne",
+    "scale": "Sur {max} · coefficient {coefficient}",
+    "enterGrades": "Saisir les notes",
+    "viewGrades": "Notes",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer « {title} » ?",
+    "deleteDescription": "Ses notes seront supprimées aussi. Cette action est définitive.",
+    "publish": "Publier",
+    "publishConfirm": "Publier « {title} » ?",
+    "publishDescription": "Les étudiants de {group} seront notifiés et verront leurs notes. Tu pourras encore corriger des notes ensuite, mais pas annuler la publication.",
+    "publishConfirmLabel": "Publier les notes",
+    "created": "Évaluation « {title} » créée.",
+    "updated": "Évaluation « {title} » modifiée.",
+    "deleted": "Évaluation « {title} » supprimée.",
+    "publishedDone": "« {title} » publiée : les étudiants ont été notifiés.",
+    "form": {
+      "createTitle": "Nouvelle évaluation",
+      "editTitle": "Modifier l'évaluation",
+      "description": "{group} · {subject}",
+      "title": "Titre",
+      "type": "Type",
+      "date": "Date",
+      "maxScore": "Note maximale",
+      "maxScoreHint": "En général 20.",
+      "coefficient": "Coefficient",
+      "coefficientHint": "Poids dans les moyennes.",
+      "create": "Créer l'évaluation",
+      "save": "Enregistrer les modifications",
+      "errors": {
+        "title": "Indique un titre (200 caractères au maximum).",
+        "type": "Choisis un type.",
+        "date": "Choisis une date.",
+        "maxScore": "Indique un nombre supérieur à 0 (1000 au maximum).",
+        "maxScoreBelow": "Certaines notes dépassent ce maximum : modifie-les d'abord.",
+        "coefficient": "Indique un nombre supérieur à 0 (100 au maximum)."
+      }
+    },
+    "sheet": {
+      "back": "Retour aux évaluations",
+      "metaTitle": "Notes — {title}",
+      "publishedNote": "Publiée le {date} : les étudiants voient ces notes.",
+      "draftNote": "Pas encore publiée : les étudiants ne voient pas ces notes.",
+      "student": "Étudiant",
+      "score": "Note (sur {max})",
+      "scoreLabel": "Note de {name}, sur {max}",
+      "comment": "Commentaire",
+      "commentLabel": "Commentaire pour {name}",
+      "on20": "Sur 20",
+      "save": "Enregistrer les notes",
+      "saved": "{count, plural, =0 {Rien à enregistrer : les notes étaient déjà à jour.} one {Notes enregistrées (# modification).} other {Notes enregistrées (# modifications).}}",
+      "unsaved": "{count, plural, =0 {Tout est enregistré} one {# modification non enregistrée} other {# modifications non enregistrées}}",
+      "invalidScore": "Indique un nombre entre 0 et {max}, ou laisse vide.",
+      "fixErrors": "Vérifie d'abord les notes signalées.",
+      "empty": "Aucun étudiant dans ce groupe.",
+      "notFound": "Cette évaluation n'existe pas ou tu ne peux pas la gérer.",
+      "tableCaption": "Feuille de notes de {title}",
+      "stats": {
+        "label": "Statistiques",
+        "graded": "Notés",
+        "average": "Moyenne de la classe",
+        "min": "Note la plus basse",
+        "max": "Note la plus haute"
+      },
+      "errors": {
+        "offline": "Tu es hors ligne : les notes ne sont pas encore enregistrées. Réessaie quand tu seras de nouveau en ligne."
+      },
+      "saveBeforePublish": "Enregistre les notes avant de publier."
+    },
+    "errors": {
+      "NOT_TEACHING": "Tu ne peux gérer que les matières que tu enseignes à ce groupe.",
+      "PUBLISHED": "Une évaluation publiée ne peut être supprimée que par l'administration."
+    },
+    "deletePublishedDescription": "Elle est déjà publiée : les notes des étudiants seront aussi supprimées. Cette action est enregistrée dans le journal d'audit."
+  },
+  "followUp": {
+    "tabsLabel": "Sections du suivi des étudiants",
+    "tabs": {
+      "alerts": "Alertes",
+      "groups": "Groupes"
+    },
+    "alerts": {
+      "title": "Alertes d'absentéisme",
+      "description": "Levées une seule fois par étudiant, matière et niveau quand les absences franchissent un seuil.",
+      "group": "Groupe",
+      "allGroups": "Tous les groupes",
+      "level": "Niveau",
+      "allLevels": "Tous les niveaux",
+      "subject": "Matière",
+      "allSubjects": "Toutes les matières",
+      "empty": "Aucune alerte pour ces filtres.",
+      "total": "{count, plural, =0 {Aucune alerte} one {# alerte} other {# alertes}}",
+      "tableCaption": "Alertes d'absentéisme, des plus récentes aux plus anciennes",
+      "columns": {
+        "date": "Date",
+        "student": "Étudiant",
+        "group": "Groupe",
+        "subject": "Matière",
+        "level": "Niveau",
+        "rate": "Taux au déclenchement"
+      },
+      "noGroup": "Sans groupe",
+      "unknownStudent": "Étudiant supprimé"
+    },
+    "groups": {
+      "group": "Groupe",
+      "noGroups": "Aucun groupe pour l'instant.",
+      "subject": "Matière",
+      "allSubjects": "Toutes les matières",
+      "sort": "Trier par",
+      "sortName": "Nom",
+      "sortAbsences": "Absences",
+      "sortAverage": "Moyenne",
+      "summaryLabel": "Résumé du groupe",
+      "students": "Étudiants",
+      "averageAttendance": "Présence moyenne",
+      "averageGrade": "Moyenne du groupe",
+      "levelsTitle": "Niveaux d'assiduité",
+      "empty": "Aucun étudiant dans ce groupe.",
+      "noSubjects": "Aucune matière dans l'emploi du temps de ce groupe pour l'instant.",
+      "tableCaption": "Étudiants de {group}",
+      "columns": {
+        "student": "Étudiant",
+        "absences": "Absences",
+        "missed": "Heures manquées",
+        "late": "Retards",
+        "average": "Moyenne",
+        "level": "Niveau"
+      },
+      "loadError": "Impossible de charger ce groupe."
+    },
+    "student": {
+      "back": "Retour au suivi des étudiants",
+      "metaTitle": "Suivi — {name}",
+      "report": "Télécharger le relevé (PDF)",
+      "reportLanguage": "Langue du relevé",
+      "studentLanguage": "Langue de l'étudiant",
+      "french": "Français",
+      "english": "Anglais",
+      "notFound": "Cet étudiant n'existe pas.",
+      "noGroup": "Sans groupe"
+    }
+  }
 }
