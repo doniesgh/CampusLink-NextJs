@@ -4,7 +4,7 @@ const HttpError = require('../utils/httpError');
 const { envBool, envNumber } = require('../utils/env');
 
 /*
- * Rate limiting of the sensitive auth routes. Every limiter answers 429 TOO_MANY_REQUESTS with a
+ * Rate limiting of the sensitive routes. Every limiter answers 429 TOO_MANY_REQUESTS with a
  * Retry-After header and details.retryAfter (seconds), and is skipped when RATE_LIMIT_ENABLED=false.
  *
  *   authRateLimit(name)      login, signup, forgot-password, verify-otp: per route + IP + normalized email
@@ -13,8 +13,11 @@ const { envBool, envNumber } = require('../utils/env');
  *                            emails), RATE_LIMIT_IP_MAX (100)
  *   changePasswordRateLimit  change-password, per user (use after requireAuth), RATE_LIMIT_PASSWORD_MAX (10)
  *   resetPasswordRateLimit   reset-password, per IP, RATE_LIMIT_RESET_MAX (20)
+ *   userRateLimit(options)   factory: a limiter of one action of a signed-in user (use after requireAuth), keyed by
+ *                            action name + user id, with its own limit and window (e.g. bookings: 30 per hour)
  *
- * All share RATE_LIMIT_WINDOW_MS (default 900000 = 15 min). Counters are in memory (one set per instance).
+ * The auth limiters share RATE_LIMIT_WINDOW_MS (default 900000 = 15 min). Counters are in memory (one set per
+ * instance).
  * The client IP is req.ip, which honours the "trust proxy" setting (TRUST_PROXY); IPv6 addresses are
  * grouped by /56 subnet (ipKeyGenerator).
  *
@@ -44,21 +47,31 @@ const emailOf = (req) => {
 };
 
 /**
- * @param {{ limitEnv: string, defaultLimit: number, key: (req) => string, skipLoopback?: boolean }} options
+ * @param {{ limitEnv: string, defaultLimit: number, key: (req) => string, skipLoopback?: boolean,
+ *           window?: number, skip?: (req) => boolean, message?: string }} options
  *        limitEnv: environment variable holding the number of requests allowed per window
  *        skipLoopback: do not count requests whose client IP (req.ip) is a loopback address (IP-only limiters)
+ *        window: window length in ms (default RATE_LIMIT_WINDOW_MS)
+ *        skip: requests this predicate accepts are not counted (e.g. an exempt role)
+ *        message: English message of the 429 answer
  */
-const createLimiter = ({ limitEnv, defaultLimit, key, skipLoopback = false }) => {
-  const window = windowMs();
-  return rateLimit({
+const createLimiter = ({
+  limitEnv,
+  defaultLimit,
+  key,
+  skipLoopback = false,
+  window = windowMs(),
+  skip = null,
+  message = 'Too many attempts, please try again later',
+}) =>
+  rateLimit({
     windowMs: window,
     limit: envNumber(limitEnv, defaultLimit),
     standardHeaders: 'draft-7',
     legacyHeaders: false,
     // Read at request time, so the setting follows the environment loaded by dotenv.
-    skip: skipLoopback
-      ? (req) => !envBool('RATE_LIMIT_ENABLED', true) || isLoopback(req.ip || '')
-      : () => !envBool('RATE_LIMIT_ENABLED', true),
+    skip: (req) =>
+      !envBool('RATE_LIMIT_ENABLED', true) || (skipLoopback && isLoopback(req.ip || '')) || Boolean(skip && skip(req)),
     keyGenerator: key,
     handler: (req, res, next) => {
       const resetTime = req.rateLimit?.resetTime;
@@ -66,10 +79,9 @@ const createLimiter = ({ limitEnv, defaultLimit, key, skipLoopback = false }) =>
         ? Math.max(1, Math.ceil((resetTime.getTime() - Date.now()) / 1000))
         : Math.ceil(window / 1000);
       res.set('Retry-After', String(retryAfter));
-      next(new HttpError(429, 'TOO_MANY_REQUESTS', 'Too many attempts, please try again later', { retryAfter }));
+      next(new HttpError(429, 'TOO_MANY_REQUESTS', message, { retryAfter }));
     },
   });
-};
 
 // One limiter (with its own counters) per route name, keyed by IP + email.
 const authRateLimit = (name) =>
@@ -103,4 +115,36 @@ const resetPasswordRateLimit = createLimiter({
   skipLoopback: true,
 });
 
-module.exports = { authRateLimit, authIpRateLimit, changePasswordRateLimit, resetPasswordRateLimit, isLoopback };
+/**
+ * Limiter of one action of a signed-in user (mount it after requireAuth): one counter per action name and user
+ * id, so users behind the same address never share a budget. Falls back to the client IP without a user.
+ *
+ * @param {{ name: string, limitEnv: string, defaultLimit: number, windowEnv?: string, defaultWindowMs?: number,
+ *           skip?: (req) => boolean, message?: string }} options
+ *        name: action name, part of the key (e.g. "booking-create")
+ *        limitEnv / defaultLimit: requests allowed per window
+ *        windowEnv / defaultWindowMs: window length in ms (default RATE_LIMIT_WINDOW_MS)
+ *        skip: requests this predicate accepts are not counted (e.g. ADMIN)
+ *        message: English message of the 429 answer
+ * Like the other limiters, the limit and the window are read when the limiter is created (module load).
+ */
+const userRateLimit = ({ name, limitEnv, defaultLimit, windowEnv, defaultWindowMs, skip = null, message }) => {
+  const fallbackWindow = defaultWindowMs ?? windowMs();
+  return createLimiter({
+    limitEnv,
+    defaultLimit,
+    window: windowEnv ? envNumber(windowEnv, fallbackWindow) : fallbackWindow,
+    skip,
+    message,
+    key: (req) => (req.user?._id ? `${name}|user:${String(req.user._id)}` : `${name}|ip:${clientIp(req)}`),
+  });
+};
+
+module.exports = {
+  authRateLimit,
+  authIpRateLimit,
+  changePasswordRateLimit,
+  resetPasswordRateLimit,
+  userRateLimit,
+  isLoopback,
+};
