@@ -14,6 +14,7 @@ import {
   RATE_LIMIT_AUTH_MAX,
   RATE_LIMIT_BOOKING_MAX,
   RATE_LIMIT_IP_MAX,
+  RATE_LIMIT_PHASE3_MAX,
   RATE_LIMIT_RESET_MAX,
   SECURITY_API_PORT,
   SECURITY_API_URL,
@@ -86,6 +87,31 @@ const phase1BackendEnv = {
   BOOKING_REMINDER_MINUTES: '60',
   ABSENCE_WARNING_RATE: '0.10',
   ABSENCE_ALERT_RATE: '0.20',
+  // Phase 3 (docs/phase3-contract.md section 6): contract defaults, whatever backend/.env says.
+  CAMPUS_LAT: '36.8992',
+  CAMPUS_LNG: '10.1897',
+  CAMPUS_LABEL: 'ESPRIT Ghazela',
+  CARPOOL_SEARCH_RADIUS_KM: '5',
+  CARPOOL_COST_PER_KM: '0.25',
+  MARKET_STARTING_TOKENS: '100',
+  MARKET_HOLD_TIMEOUT_MS: '120000',
+};
+
+/** Phase 3 per-user limits of the security backend (backend/docs/carpool.md, marketplace.md, alumni.md). */
+const phase3SecurityLimits = {
+  RATE_LIMIT_REALTIME_TICKET_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_CARPOOL_MESSAGE_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_CARPOOL_MESSAGE_WINDOW_MS: '60000',
+  RATE_LIMIT_CARPOOL_TRIP_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_CARPOOL_REQUEST_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_CARPOOL_WINDOW_MS: '3600000',
+  RATE_LIMIT_MARKET_UPLOAD_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_MARKET_REPORT_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_MARKET_WINDOW_MS: '3600000',
+  RATE_LIMIT_ALUMNI_POST_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_ALUMNI_POST_WINDOW_MS: '86400000',
+  RATE_LIMIT_MENTORING_MAX: String(RATE_LIMIT_PHASE3_MAX),
+  RATE_LIMIT_MENTORING_WINDOW_MS: '86400000',
 };
 
 const nextBin = 'node node_modules/next/dist/bin/next';
@@ -200,6 +226,7 @@ export default defineConfig({
               RATE_LIMIT_BOOKING_CREATE_MAX: String(RATE_LIMIT_BOOKING_MAX),
               RATE_LIMIT_BOOKING_CANCEL_MAX: String(RATE_LIMIT_BOOKING_MAX),
               RATE_LIMIT_BOOKING_WINDOW_MS: '3600000',
+              ...phase3SecurityLimits,
               VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
               VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
               VAPID_SUBJECT: 'mailto:security-tests@campuslink.test',
@@ -221,6 +248,9 @@ export default defineConfig({
               API_URL,
               COOKIE_SECURE: 'false',
               NEXT_TELEMETRY_DISABLED: '1',
+              // Phase 3 real-time layer: the test backend (Socket.IO on the API port), also in the CSP connect-src.
+              // Inlined at build time with E2E_NEXT_MODE=start.
+              NEXT_PUBLIC_REALTIME_URL: API_URL,
             },
           },
         ]

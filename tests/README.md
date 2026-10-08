@@ -17,8 +17,19 @@ API and web UI contracts.
   limits of booking creations and cancellations (security backend), one admin notification per requester every 10
   minutes, the grades audit trail (a teacher cannot delete a published assessment), NoSQL / regex injection,
   plain-text forum content in the web page, the group comparison (every figure from at least 5 students) and a final
-  scan of every phase 2 answer (no email, raw id, snapshot or internal field). A failing test there is a
-  vulnerability to fix in `backend/` or `next/`, not in the test.
+  scan of every phase 2 answer (no email, raw id, snapshot or internal field). Its `phase 3` block covers the
+  real-time layer, carpooling, the notes marketplace and the alumni network: Socket.IO handshakes (missing,
+  malformed, expired, replayed or forged tickets and tokens, foreign `Origin`, 20 connections per account, 16 KB
+  messages), a ticket is useless on the REST API, `trip:<id>` rooms and their `chat:message` only for the driver and
+  the accepted passengers, `notification:new` only for its recipient, connections closed when their session ends
+  (password change, logout of that session only, role change, session ended elsewhere), exact trip coordinates only for participants (detail, search, history, web page), concurrent seat accepts and
+  cancellations, premium files and unpublished documents (404), concurrent purchases (no double charge, never below
+  zero), wallets, reviews, PRIVATE alumni profiles and consent, e-mails only inside an accepted mentoring request, the
+  GDPR export and erasure (also when an admin deletes the account, whose open connections are closed too),
+  plain-text posts and https links, role checks, mass assignment, NoSQL / regex injection,
+  the phase 3 per-user rate limits (security backend), the BFF (tickets, premium files, cross-site writes) and a final
+  scan of every phase 3 answer. The real-time checks use the web app's own `socket.io-client` (`next/node_modules`).
+  A failing test there is a vulnerability to fix in `backend/` or `next/`, not in the test.
 - `e2e/`: Chromium tests of the Next.js app. They use accessible labels and roles, and fail on browser
   console errors. `e2e/offline-privacy.spec.ts` needs the service worker, so it only runs with
   `E2E_NEXT_MODE=start` (it is skipped otherwise).
@@ -58,8 +69,12 @@ Development ports (3000, 4000, 27017) are never used.
 | --------------- | ----------------------------------------------- | ----------------------------------------------------------- |
 | MongoDB         | `mongodb://127.0.0.1:27018/campuslink-test`     | `scripts/test-db.mjs`; empty for every run                  |
 | Backend         | `http://localhost:4100`                         | `JWT_SECRET=test-secret`, `OTP_MAX_ATTEMPTS=3`, no SMTP, rate limiting off, push disabled |
-| Security backend| `http://localhost:4101`                         | only when `api/security.spec.ts` runs: own database, `RATE_LIMIT_AUTH_MAX=3`, `RATE_LIMIT_IP_MAX=30`, `RATE_LIMIT_RESET_MAX=5`, `RATE_LIMIT_BOOKING_CREATE_MAX` / `RATE_LIMIT_BOOKING_CANCEL_MAX=5` per hour, test VAPID keys |
-| Next.js         | `http://localhost:3100`                         | `next dev`, with `API_URL=http://localhost:4100` (skipped for api-only runs without the security spec) |
+| Security backend| `http://localhost:4101`                         | only when `api/security.spec.ts` runs: own database, `RATE_LIMIT_AUTH_MAX=3`, `RATE_LIMIT_IP_MAX=30`, `RATE_LIMIT_RESET_MAX=5`, `RATE_LIMIT_BOOKING_CREATE_MAX` / `RATE_LIMIT_BOOKING_CANCEL_MAX=5` per hour, phase 3 per-user limits at 3 (real-time tickets, carpool trips / requests / messages, marketplace uploads / reports, alumni posts / mentoring requests), test VAPID keys |
+| Next.js         | `http://localhost:3100`                         | `next dev`, with `API_URL=http://localhost:4100` and `NEXT_PUBLIC_REALTIME_URL=http://localhost:4100` (skipped for api-only runs without the security spec) |
+
+Both backends also get the phase 3 contract defaults (`CAMPUS_LAT`, `CAMPUS_LNG`, `CAMPUS_LABEL`,
+`CARPOOL_SEARCH_RADIUS_KM`, `CARPOOL_COST_PER_KM`, `MARKET_STARTING_TOKENS`, `MARKET_HOLD_TIMEOUT_MS`), whatever
+`backend/.env` says. Socket.IO runs on the backend's own port (path `/socket.io`).
 
 Environment variables passed to the backend take precedence over `backend/.env`, so your own
 database and secrets are never used. Emails are not sent: the backend writes them to
@@ -74,7 +89,9 @@ The backend still appends its audit log to `backend/logs/operations.log` during 
 - **"Another next dev server is already running"**: Next.js 16 allows only one `next dev` per project
   folder. Stop your own `npm run dev` in `next/`, or test a production build instead:
   `E2E_NEXT_MODE=start NEXT_DIST_DIR=.next-e2e npm run test:e2e` (runs `next build` + `next start` on port
-  3100; `NEXT_DIST_DIR` keeps your own `.next` build untouched).
+  3100; `NEXT_DIST_DIR` keeps your own `.next` build untouched). Such a run adds `.next-e2e/...` lines to
+  `next/tsconfig.json` and rewrites the imports of `next/next-env.d.ts`: restore both and delete the folder
+  afterwards. The same variables also work for `npm test` (the whole suite against one production build).
 - **"available disk space ... is less than required minimum"** in the backend output: the test MongoDB
   refuses to build indexes with less than 500 MB free on the disk. Free some space first.
 - **UI login/signup tests time out on a busy machine**: four browsers plus `next dev` can push a page or a

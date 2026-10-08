@@ -9,8 +9,8 @@ export function decodeJwt(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
 }
 
-/** Signs an HS256 JWT, e.g. to build an expired access token with the test secret. */
-export function signJwt(payload: Record<string, unknown>, secret: string): string {
+/** Signs an HS256 JWT, e.g. to build an expired access token with the test secret (or a derived key). */
+export function signJwt(payload: Record<string, unknown>, secret: string | Buffer): string {
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = base64url(JSON.stringify(payload));
   const signature = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');

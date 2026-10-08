@@ -9,11 +9,14 @@ import {
   API_PORT,
   API_URL,
   BACKEND_DIR,
+  JWT_SECRET,
   MONGO_URI,
+  NEXT_DIR,
   PUSH_OUTBOX_FILE,
   RATE_LIMIT_AUTH_MAX,
   RATE_LIMIT_BOOKING_MAX,
   RATE_LIMIT_IP_MAX,
+  RATE_LIMIT_PHASE3_MAX,
   RATE_LIMIT_RESET_MAX,
   SECURITY_API_URL,
   SECURITY_MONGO_URI,
@@ -22,12 +25,14 @@ import {
   TMP_DIR,
   WEB_URL,
 } from '../support/env';
+import { decodeJwt, expiredAccessToken, signJwt } from '../support/jwt';
 import { extractResetLink, mailsTo, waitForMail } from '../support/outbox';
 
 /**
- * Phase-1 security checks (one file, no functional coverage): authorization, IDOR, mass assignment,
- * uploads, injection, secret leaks, rate limiting and the web app's BFF / redirects / headers.
- * Backends: 4100 (main, rate limiting off) and 4101 (rate limiting on, test VAPID keys); Next.js on 3100.
+ * Security checks of phases 1 to 3 (one file, no functional coverage): authorization, IDOR, mass assignment,
+ * uploads, injection, secret leaks, rate limiting, the web app's BFF / redirects / headers, and (phase 3) the
+ * Socket.IO real-time layer, carpooling privacy and seats, marketplace files and wallets, alumni consent and GDPR.
+ * Backends: 4100 (main, rate limiting off, Socket.IO) and 4101 (rate limiting on, test VAPID keys); Next.js on 3100.
  */
 
 type Res = { status: number; body: any; text: string; headers: Record<string, string>; url: string };
@@ -95,12 +100,12 @@ async function login(email: string, password: string, base = API_URL) {
   return { id: res.body.user.id as string, token: res.body.accessToken as string, refreshToken: res.body.refreshToken as string };
 }
 
-async function createUser(adminToken: string, role: string, group?: string): Promise<Person> {
+async function createUser(adminToken: string, role: string, group?: string, names: { firstname?: string; lastname?: string } = {}): Promise<Person> {
   const email = uniqueEmail(`sec-${role.toLowerCase()}`);
   const password = secret('password', `Sec-${rand()}-Passw0rd!`);
   const res = await call('POST', '/api/users', {
     token: adminToken,
-    json: { firstname: 'Sec', lastname: role, email, password, role, ...(group ? { group } : {}) },
+    json: { firstname: names.firstname ?? 'Sec', lastname: names.lastname ?? role, email, password, role, ...(group ? { group } : {}) },
   });
   expect(res.status, `create ${role}: ${res.text}`).toBe(201);
   return { email, password, ...(await login(email, password)) };
@@ -1690,6 +1695,1425 @@ test.describe('phase 2', () => {
   });
 });
 
+// ---------------------------------------------------------------- phase 3: real-time layer, carpooling, marketplace, alumni
+
+/** Socket.IO client of the web app (next/node_modules/socket.io-client): the same library and protocol as the browser. */
+type ClientSocket = {
+  on(event: string, listener: (...args: any[]) => void): unknown;
+  once(event: string, listener: (...args: any[]) => void): unknown;
+  onAny(listener: (event: string, ...args: any[]) => void): unknown;
+  emit(event: string, ...args: unknown[]): unknown;
+  timeout(ms: number): { emitWithAck(event: string, ...args: unknown[]): Promise<any> };
+  disconnect(): unknown;
+};
+type SocketFactory = (url: string, options: Record<string, unknown>) => ClientSocket;
+/** A connection attempt: every event received, why the handshake was refused (null when it was not), whether it closed. */
+type Live = { socket: ClientSocket; events: { event: string; payload: any }[]; refused: { message: string; code: string | null } | null; closed: boolean };
+
+let socketFactory: SocketFactory | undefined;
+const sockets: ClientSocket[] = [];
+
+/** Opens a Socket.IO connection to the main backend (WebSocket only, no automatic reconnection) and waits for the handshake. */
+async function openSocket(auth?: Record<string, unknown>, headers?: Record<string, string>): Promise<Live> {
+  socketFactory ??= (require(path.join(NEXT_DIR, 'node_modules', 'socket.io-client')) as { io: SocketFactory }).io;
+  const socket = socketFactory(API_URL, {
+    path: '/socket.io',
+    transports: ['websocket'],
+    reconnection: false,
+    forceNew: true,
+    timeout: 15_000,
+    ...(auth ? { auth } : {}),
+    ...(headers ? { extraHeaders: headers } : {}),
+  });
+  sockets.push(socket);
+  const live: Live = { socket, events: [], refused: null, closed: false };
+  socket.onAny((event: string, payload: unknown) => live.events.push({ event, payload }));
+  socket.on('disconnect', () => {
+    live.closed = true;
+  });
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(() => {
+      live.refused = { message: 'no answer to the handshake', code: null };
+      resolve();
+    }, 20_000);
+    socket.once('connect', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    socket.once('connect_error', (error: { message?: string; data?: { code?: string } }) => {
+      clearTimeout(timer);
+      live.refused = { message: String(error?.message ?? ''), code: error?.data?.code ?? null };
+      resolve();
+    });
+  });
+  return live;
+}
+
+const closeSockets = () => {
+  for (const socket of sockets.splice(0)) socket.disconnect();
+};
+
+/** Ack of `room:join` ({ ok: true } | { ok: false, error }). */
+async function joinRoom(live: Live, room: unknown): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    return await live.socket.timeout(10_000).emitWithAck('room:join', typeof room === 'string' ? { room } : room);
+  } catch {
+    return { ok: false, error: 'NO_ACK' };
+  }
+}
+
+const received = (live: Live, event: string) => live.events.filter((item) => item.event === event).map((item) => item.payload);
+
+/** A ticket may only appear in the answer of the ticket endpoint. */
+const REALTIME_TICKET_PATHS = /^\/(api|bff)\/realtime\/ticket$/;
+/** Key of the real-time tickets (backend/docs/carpool.md): HMAC-SHA256(JWT_SECRET, "campuslink:realtime-ticket:v1"). */
+const TICKET_KEY = crypto.createHmac('sha256', JWT_SECRET).update('campuslink:realtime-ticket:v1').digest();
+
+async function realtimeTicket(token: string): Promise<string> {
+  const res = await call('GET', '/api/realtime/ticket', { token });
+  expect(res.status, `realtime ticket: ${res.text}`).toBe(200);
+  return secret('realtime ticket', res.body.ticket, REALTIME_TICKET_PATHS);
+}
+
+/** A ticket signed by the test (valid by default: 60 s, audience "realtime", issuer "campuslink"). */
+function forgeTicket(sub: string, claims: Record<string, unknown> = {}, key: string | Buffer = TICKET_KEY): string {
+  const now = Math.floor(Date.now() / 1000);
+  return signJwt({ jti: crypto.randomBytes(16).toString('base64url'), aud: 'realtime', iss: 'campuslink', sub, iat: now, exp: now + 60, ...claims }, key);
+}
+
+/** A connection of `person` opened like the web app does (single-use ticket from GET /api/realtime/ticket). */
+const webSocketOf = async (person: Person) => openSocket({ ticket: await realtimeTicket(person.token) });
+
+/** Sorted "status CODE" of concurrent answers. */
+const outcomes = (results: Res[]) => results.map((res) => `${res.status} ${res.body?.code ?? ''}`.trim()).sort();
+const countOf = (list: string[], value: string) => list.filter((item) => item === value).length;
+
+/** Exact departure of the test trips (a street of Ariana) and what everyone but the participants must get (~1 km). */
+const EXACT_POINT = { lat: 36.862347, lng: 10.195671 };
+const ROUNDED_POINT = { lat: 36.86, lng: 10.2 };
+const EXACT_DIGITS = /862347|195671/;
+
+async function offerTrip(driver: Person, json: Record<string, unknown> = {}) {
+  const res = await call('POST', '/api/carpool/trips', {
+    token: driver.token,
+    json: { departure: { label: 'Ariana', ...EXACT_POINT }, departureAt: `${campusDay(2)}T07:45`, seats: 3, pricePerSeat: 2, ...json },
+  });
+  expect(res.status, `offer a trip: ${res.text}`).toBe(201);
+  return res.body as { id: string } & Record<string, any>;
+}
+
+async function requestSeat(person: Person, tripId: string, seats = 1): Promise<string> {
+  const res = await call('POST', `/api/carpool/trips/${tripId}/requests`, { token: person.token, json: { seats } });
+  expect(res.status, `seat request: ${res.text}`).toBe(201);
+  return res.body.id;
+}
+
+async function acceptSeat(driver: Person, requestId: string) {
+  const res = await call('POST', `/api/carpool/requests/${requestId}/accept`, { token: driver.token });
+  expect(res.status, `accept: ${res.text}`).toBe(200);
+}
+
+const marketForm = (data: Record<string, unknown>, files: File[]) => {
+  const form = new FormData();
+  form.append('data', JSON.stringify(data));
+  files.forEach((item) => form.append('file', item));
+  return form;
+};
+
+const uploadDocument = (person: Person, data: Record<string, unknown>, files: File[]) =>
+  call('POST', '/api/marketplace/documents', { token: person.token, form: marketForm({ subject: w.subjectId, ...data }, files) });
+
+/**
+ * A marketplace document of `author` titled "Notes <words>" (its PDF contains `words`), brought to `status` by an admin.
+ * Returns its id.
+ */
+async function marketDocument(author: Person, price: number, words: string, status = 'PUBLISHED'): Promise<string> {
+  const res = await uploadDocument(author, { title: `Notes ${words}`, description: `About ${words}`, price }, [
+    file(`${words.replace(/\W+/g, '-')}.pdf`, 'application/pdf', pdf(words)),
+  ]);
+  expect(res.status, `upload: ${res.text}`).toBe(201);
+  const id = res.body.id as string;
+  const moderate = async (action: string, json?: unknown) => {
+    const decided = await call('POST', `/api/marketplace/documents/${id}/${action}`, { token: w.admin.token, json });
+    expect(decided.status, `${action}: ${decided.text}`).toBe(200);
+  };
+  if (status === 'REJECTED') await moderate('reject', { reason: 'Not suitable for the marketplace' });
+  if ((status === 'PUBLISHED' || status === 'UNPUBLISHED') && res.body.status !== 'PUBLISHED') await moderate('approve');
+  if (status === 'UNPUBLISHED') await moderate('unpublish', { reason: 'Copyright complaint' });
+  return id;
+}
+
+type WalletJson = { balance: number; transactions: { type: string; amount: number; balanceAfter: number | null }[] };
+async function walletOf(person: Person): Promise<WalletJson> {
+  const res = await call('GET', '/api/marketplace/wallet?limit=100', { token: person.token });
+  expect(res.status, res.text).toBe(200);
+  return res.body;
+}
+
+const MENTORING_MESSAGE = 'I would love your advice on my final-year project and on my first job search.';
+
+/** An ALUMNI account with a CAMPUS profile (explicit consent) open to mentoring. */
+async function listedAlumni(names: { firstname?: string; lastname?: string } = {}, profile: Record<string, unknown> = {}) {
+  const person = await createUser(w.admin.token, 'ALUMNI', undefined, names);
+  const res = await call('PUT', '/api/alumni/me', {
+    token: person.token,
+    json: { headline: 'Software engineer', mentoringAvailable: true, mentoringTopics: ['Careers'], visibility: 'CAMPUS', consent: true, ...profile },
+  });
+  expect(res.status, `alumni profile: ${res.text}`).toBe(200);
+  return { ...person, profileId: res.body.id as string };
+}
+
+const askMentoring = (student: Person, profileId: string) =>
+  call('POST', `/api/alumni/${profileId}/mentoring`, { token: student.token, json: { topic: 'Career advice', message: MENTORING_MESSAGE } });
+
+const cookieOf = (person: Person) => `cl_access=${person.token}; cl_refresh=${person.refreshToken}`;
+
+test.describe('phase 3', () => {
+  test.describe.configure({ timeout: 180_000 });
+  test.afterEach(() => closeSockets());
+
+  // ---------- real-time layer
+
+  test('real-time: the handshake needs a valid ticket or access token; tickets are single use, short-lived and useless on the REST API', async () => {
+    const person = await createUser(w.admin.token, 'STUDENT');
+    const failures: string[] = [];
+
+    // GET /api/realtime/ticket: signed-in users only, never cached, 60 s, audience "realtime", subject = the caller.
+    expectAnswer(failures, 'anonymous ticket', await call('GET', '/api/realtime/ticket'), 401, 'AUTH_REQUIRED');
+    const issued = await call('GET', '/api/realtime/ticket', { token: person.token });
+    expect(issued.status, issued.text).toBe(200);
+    const ticket = secret('realtime ticket', issued.body.ticket, REALTIME_TICKET_PATHS);
+    expect(issued.headers['cache-control']).toMatch(/no-store/);
+    const claims = decodeJwt(ticket);
+    expect(claims).toMatchObject({ aud: 'realtime', sub: person.id });
+    expect(Number(claims.exp) - Number(claims.iat)).toBeLessThanOrEqual(60);
+    // A ticket handed to the browser is not an access token.
+    expectAnswer(failures, 'ticket as a REST access token', await call('GET', '/api/users/me', { token: ticket }), 401, 'INVALID_TOKEN');
+    expectAnswer(failures, 'ticket to get another ticket', await call('GET', '/api/realtime/ticket', { token: ticket }), 401, 'INVALID_TOKEN');
+
+    const now = Math.floor(Date.now() / 1000);
+    const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const unsigned = `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ jti: rand(), aud: 'realtime', iss: 'campuslink', sub: person.id, exp: now + 60 })}.`;
+    const refused: [string, Record<string, unknown> | undefined, string][] = [
+      ['no credential', undefined, 'AUTH_REQUIRED'],
+      ['empty ticket', { ticket: '' }, 'AUTH_REQUIRED'],
+      ['operator object as ticket', { ticket: { $ne: null } }, 'AUTH_REQUIRED'],
+      ['malformed ticket', { ticket: 'not-a-ticket' }, 'INVALID_TOKEN'],
+      ['expired ticket', { ticket: forgeTicket(person.id, { iat: now - 120, exp: now - 60 }) }, 'TOKEN_EXPIRED'],
+      ['ticket signed with JWT_SECRET itself', { ticket: forgeTicket(person.id, {}, JWT_SECRET) }, 'INVALID_TOKEN'],
+      ['ticket of another audience', { ticket: forgeTicket(person.id, { aud: 'api' }) }, 'INVALID_TOKEN'],
+      ['unsigned ticket (alg none)', { ticket: unsigned }, 'INVALID_TOKEN'],
+      ['ticket of an unknown account', { ticket: forgeTicket(crypto.randomBytes(12).toString('hex')) }, 'INVALID_TOKEN'],
+      ['access token sent as a ticket', { ticket: person.token }, 'INVALID_TOKEN'],
+      ['ticket sent as an access token', { token: ticket }, 'INVALID_TOKEN'],
+      ['expired access token', { token: expiredAccessToken(person.id, 'STUDENT', JWT_SECRET) }, 'TOKEN_EXPIRED'],
+      ['access token signed with another secret', { token: signJwt({ role: 'ADMIN', sub: person.id, iat: now, exp: now + 600 }, 'not-the-secret') }, 'INVALID_TOKEN'],
+    ];
+    for (const [label, auth, code] of refused) {
+      const live = await openSocket(auth);
+      if (live.refused?.code !== code) failures.push(`${label}: ${live.refused ? `refused with ${live.refused.code}` : 'connected'}, expected ${code}`);
+    }
+
+    // The issued ticket works once. Positive controls: a valid ticket (test key) and the access token (Flutter).
+    const first = await openSocket({ ticket });
+    if (first.refused) failures.push(`issued ticket refused: ${first.refused.code}`);
+    const replay = await openSocket({ ticket });
+    if (replay.refused?.code !== 'INVALID_TOKEN') failures.push(`replayed ticket: ${replay.refused ? replay.refused.code : 'connected'}`);
+    if ((await openSocket({ ticket: forgeTicket(person.id) })).refused) failures.push('a valid ticket signed with the derived key was refused');
+    if ((await openSocket({ token: `Bearer ${person.token}` })).refused) failures.push('the access token was refused');
+
+    // Browsers: the Origin must be the web app (CORS headers do not protect WebSockets).
+    for (const origin of ['http://evil.example', `${WEB_ORIGIN}.evil.example`, 'null']) {
+      const live = await openSocket({ ticket: await realtimeTicket(person.token) }, { Origin: origin });
+      if (!live.refused) failures.push(`Origin ${origin} accepted`);
+    }
+    if ((await openSocket({ ticket: await realtimeTicket(person.token) }, { Origin: WEB_ORIGIN })).refused) failures.push('the web app origin was refused');
+
+    // Bounded resources: 20 connections per account, 16 KB per client message.
+    const crowd = await createUser(w.admin.token, 'STUDENT');
+    for (let i = 0; i < 20; i += 1) {
+      const live = await openSocket({ token: crowd.token });
+      if (live.refused) failures.push(`connection ${i + 1} of 20 refused: ${live.refused.code}`);
+    }
+    const extra = await openSocket({ token: crowd.token });
+    if (extra.refused?.code !== 'TOO_MANY_CONNECTIONS') failures.push(`21st connection: ${extra.refused?.code ?? 'connected'}`);
+    first.socket.emit('room:join', { room: `trip:${'a'.repeat(20 * 1024)}` });
+    await waitFor(async () => (first.closed ? true : undefined), 'the server to close a connection that sent 20 KB', 10_000).catch(() =>
+      failures.push('a 20 KB client message did not close the connection')
+    );
+    expect(failures).toEqual([]);
+  });
+
+  test('real-time and carpool: only the driver and the accepted passengers join trip:<id> and get its chat; notification:new only reaches its recipient', async () => {
+    const admin = w.admin.token;
+    const [driver, passenger, pending, outsider] = await Promise.all([
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+    ]);
+    const trip = await offerTrip(driver);
+    const room = `trip:${trip.id}`;
+    const chat = `/api/carpool/trips/${trip.id}/messages`;
+    const accepted = await requestSeat(passenger, trip.id);
+    await acceptSeat(driver, accepted);
+    const waiting = await requestSeat(pending, trip.id);
+
+    const live = {
+      driver: await webSocketOf(driver),
+      passenger: await webSocketOf(passenger),
+      pending: await openSocket({ token: pending.token }), // the Flutter handshake
+      outsider: await webSocketOf(outsider),
+      admin: await webSocketOf(w.admin),
+    };
+    for (const [who, item] of Object.entries(live)) expect(item.refused, `${who} handshake`).toBeNull();
+
+    const failures: string[] = [];
+    const join = async (who: keyof typeof live, target: unknown, ok: boolean, error?: string) => {
+      const ack = await joinRoom(live[who], target);
+      if (Boolean(ack?.ok) !== ok || (error && ack?.error !== error)) failures.push(`${who} joins ${JSON.stringify(target).slice(0, 80)}: ${JSON.stringify(ack)}`);
+    };
+    await join('driver', room, true);
+    await join('passenger', room, true);
+    await join('pending', room, false, 'FORBIDDEN');
+    await join('outsider', room, false, 'FORBIDDEN');
+    await join('admin', room, false, 'FORBIDDEN');
+    await join('outsider', room.replace(/[a-f]/g, (c) => c.toUpperCase()), false, 'FORBIDDEN');
+    await join('outsider', `user:${driver.id}`, false, 'FORBIDDEN');
+    await join('outsider', `TRIP:${trip.id}`, false, 'INVALID_ROOM');
+    await join('outsider', `admin:${trip.id}`, false, 'UNKNOWN_ROOM');
+    await join('outsider', 'trip:{"$ne":null}', false, 'INVALID_ROOM');
+    await join('outsider', { room: { $ne: null } }, false, 'INVALID_ROOM');
+
+    // Client events are never relayed to other sockets.
+    live.outsider.socket.emit('chat:message', { tripId: trip.id, body: 'spoofed message' });
+    live.outsider.socket.emit('notification:new', { id: 'spoofed', type: 'CARPOOL', title: 'spoofed' });
+
+    const marker = `chat-${rand()}`;
+    const sent = await call('POST', chat, { token: driver.token, json: { body: `Meet at 7:40 ${marker}` } });
+    expect(sent.status, sent.text).toBe(201);
+    const message = await waitFor(async () => received(live.passenger, 'chat:message').find((item) => item?.body?.includes(marker)), "the passenger's chat:message");
+    expect(Object.keys(message).sort()).toEqual(['body', 'clientRequestId', 'createdAt', 'id', 'sender', 'tripId']);
+    expect(Object.keys(message.sender).sort()).toEqual(['firstname', 'id', 'lastname']);
+    await pause(1000);
+    for (const who of ['pending', 'outsider', 'admin'] as const) {
+      for (const event of ['chat:message', 'trip:updated']) if (received(live[who], event).length > 0) failures.push(`${who} received ${event}`);
+    }
+    if (received(live.passenger, 'chat:message').some((item) => item?.body === 'spoofed message')) failures.push('a chat:message sent by a client was relayed');
+    if (received(live.passenger, 'notification:new').some((item) => item?.id === 'spoofed')) failures.push('a notification:new sent by a client was relayed');
+
+    // The chat history: participants only (403 for pending passengers, other students, admins, teachers).
+    for (const [who, person] of [['pending passenger', pending], ['other student', outsider], ['admin', w.admin], ['teacher', w.teacher1]] as const) {
+      expectAnswer(failures, `${who} reads the chat`, await call('GET', chat, { token: person.token }), 403, 'FORBIDDEN');
+      expectAnswer(failures, `${who} writes in the chat`, await call('POST', chat, { token: person.token, json: { body: 'Let me in' } }), 403, 'FORBIDDEN');
+    }
+    const history = await call('GET', chat, { token: passenger.token });
+    expect(history.status, history.text).toBe(200);
+    expect((history.body.items as any[]).map((item) => item.body)).toEqual([`Meet at 7:40 ${marker}`]);
+
+    // The driver declines the pending request: only that passenger's sockets get notification:new.
+    const declined = await call('POST', `/api/carpool/requests/${waiting}/decline`, { token: driver.token, json: { message: 'Sorry, full' } });
+    expect(declined.status, declined.text).toBe(200);
+    const hint = await waitFor(async () => received(live.pending, 'notification:new').find((item) => item?.type === 'CARPOOL'), "the declined passenger's notification:new");
+    expect(Object.keys(hint).sort()).toEqual(['id', 'title', 'type']);
+    const inbox = await call('GET', '/api/notifications?limit=20', { token: pending.token });
+    expect((inbox.body.items as any[]).map((item) => item.id)).toContain(hint.id);
+    await pause(1000);
+    for (const who of ['driver', 'passenger', 'outsider', 'admin'] as const) {
+      if (received(live[who], 'notification:new').some((item) => item?.id === hint.id)) failures.push(`${who} received another user's notification:new`);
+    }
+    await join('pending', room, false, 'FORBIDDEN');
+
+    // A passenger who gives up the seat leaves the room at once and loses the chat.
+    expect((await call('POST', `/api/carpool/requests/${accepted}/cancel`, { token: passenger.token })).status).toBe(200);
+    const later = `later-${rand()}`;
+    expect((await call('POST', chat, { token: driver.token, json: { body: `Still coming? ${later}` } })).status).toBe(201);
+    await waitFor(async () => received(live.driver, 'chat:message').find((item) => item?.body?.includes(later)), "the driver's own chat:message");
+    await pause(1000);
+    if (received(live.passenger, 'chat:message').some((item) => item?.body?.includes(later))) failures.push('the passenger who cancelled still receives the chat');
+    expectAnswer(failures, 'former passenger reads the chat', await call('GET', chat, { token: passenger.token }), 403, 'FORBIDDEN');
+    await join('passenger', room, false, 'FORBIDDEN');
+    expect(failures).toEqual([]);
+  });
+
+  test('real-time: a password change (every session revoked) also ends the connections opened before it', async () => {
+    // Pushes stop with the revoked sessions (their subscriptions are deleted); an open socket must stop too.
+    const admin = w.admin.token;
+    const tag = rand().toUpperCase();
+    const group = await call('POST', '/api/academic/groups', {
+      token: admin,
+      json: { name: `SEC-${tag}-RT`, level: 4, academicYear: '2026-2027', program: w.programId },
+    });
+    expect(group.status, group.text).toBe(201);
+    const person = await createUser(admin, 'STUDENT', group.body.id);
+    const connections = {
+      'web (ticket)': await webSocketOf(person),
+      'mobile (access token)': await openSocket({ token: person.token }),
+      // A ticket without a session (`sid`): closed with every session of the account (backend/docs/carpool.md).
+      'ticket without a session': await openSocket({ ticket: forgeTicket(person.id) }),
+    };
+    for (const [label, live] of Object.entries(connections)) expect(live.refused, label).toBeNull();
+    // Issued before the change, used after it.
+    const unusedTicket = await realtimeTicket(person.token);
+
+    const changed = secret('password', `Sec-${rand()}-Changed3!`);
+    const change = await call('POST', '/api/auth/change-password', { token: person.token, json: { currentPassword: person.password, newPassword: changed } });
+    expect(change.status, change.text).toBe(200);
+    const failures: string[] = [];
+    // The server closes them: they do not only stop receiving.
+    await waitFor(async () => (Object.values(connections).every((live) => live.closed) ? true : undefined), 'the server to close the connections', 10_000).catch(() =>
+      failures.push(`still open after the password change: ${Object.entries(connections).filter(([, live]) => !live.closed).map(([label]) => label).join(', ')}`)
+    );
+    // The credentials of the revoked sessions open nothing, even before they expire.
+    const lateTicket = await openSocket({ ticket: unusedTicket });
+    if (lateTicket.refused?.code !== 'INVALID_TOKEN') failures.push(`ticket of a revoked session: ${lateTicket.refused?.code ?? 'connected'}`);
+    const oldToken = await openSocket({ token: person.token });
+    if (oldToken.refused?.code !== 'INVALID_TOKEN') failures.push(`access token of a revoked session: ${oldToken.refused?.code ?? 'connected'}`);
+    expectAnswer(failures, 'ticket for the access token of a revoked session', await call('GET', '/api/realtime/ticket', { token: person.token }), 401, 'INVALID_TOKEN');
+
+    const session = await login(person.email, changed);
+    const fresh = await webSocketOf({ ...person, ...session });
+    expect(fresh.refused, 'positive control: the new session connects').toBeNull();
+    // Something new for the account: an announcement to its group (in-app notification, so notification:new).
+    const published = await announce(admin, { title: `Realtime ${tag}`, body: 'After the password change', audience: { groups: [group.body.id] }, action: 'publish' });
+    expect(published.status, published.text).toBe(201);
+    const notification = await waitFor(async () => {
+      const list = await call('GET', '/api/notifications?limit=20', { token: session.token });
+      return (list.body.items as any[]).find((item) => item.data?.announcementId === published.body.id);
+    }, 'the notification of the announcement');
+    await waitFor(async () => received(fresh, 'notification:new').find((item) => item?.id === notification.id), "positive control: the new session's notification:new");
+    await pause(1000);
+    const leaked = Object.entries(connections)
+      .filter(([, live]) => received(live, 'notification:new').some((item) => item?.id === notification.id))
+      .map(([label]) => label);
+    expect(leaked, 'connections opened before the password change still receive the notifications of the account').toEqual([]);
+    expect(failures).toEqual([]);
+  });
+
+  test('real-time: a logout closes the connections of that session only, a role change closes them all, and a session ended elsewhere cannot join a room', async () => {
+    const admin = w.admin.token;
+    const person = await createUser(admin, 'STUDENT');
+    const second = { ...person, ...(await login(person.email, person.password)) }; // another device
+    const failures: string[] = [];
+    const openOf = (label: string, group: Record<string, Live>) => Object.entries(group).filter(([, live]) => !live.closed).map(([name]) => `${label} ${name}`);
+
+    const ended = { 'web (ticket)': await webSocketOf(person), 'mobile (access token)': await openSocket({ token: person.token }) };
+    const kept = { 'web (ticket)': await webSocketOf(second), 'mobile (access token)': await openSocket({ token: second.token }) };
+    for (const [label, live] of [...Object.entries(ended), ...Object.entries(kept)]) expect(live.refused, label).toBeNull();
+    const unusedTicket = await realtimeTicket(person.token);
+
+    // Logout of the first session: its connections close, the other device's stay open.
+    const out = await call('POST', '/api/auth/logout', { json: { refreshToken: person.refreshToken } });
+    expect(out.status, out.text).toBe(204);
+    await waitFor(async () => (openOf('', ended).length === 0 ? true : undefined), 'the server to close the connections of the ended session', 10_000).catch(() =>
+      failures.push(`still open after the logout: ${openOf('ended session', ended).join(', ')}`)
+    );
+    await pause(1000);
+    if (openOf('', kept).length !== 2) failures.push('a logout closed the connections of another session of the account');
+    const lateTicket = await openSocket({ ticket: unusedTicket });
+    if (lateTicket.refused?.code !== 'INVALID_TOKEN') failures.push(`ticket of a logged-out session: ${lateTicket.refused?.code ?? 'connected'}`);
+    const oldToken = await openSocket({ token: person.token });
+    if (oldToken.refused?.code !== 'INVALID_TOKEN') failures.push(`access token of a logged-out session: ${oldToken.refused?.code ?? 'connected'}`);
+    expectAnswer(failures, 'ticket for the access token of a logged-out session', await call('GET', '/api/realtime/ticket', { token: person.token }), 401, 'INVALID_TOKEN');
+
+    // Role change by an admin: every connection closes (rooms were joined under the old role); the session reconnects.
+    const promoted = await call('PATCH', `/api/users/${person.id}`, { token: admin, json: { role: 'ALUMNI' } });
+    expect(promoted.status, promoted.text).toBe(200);
+    await waitFor(async () => (openOf('', kept).length === 0 ? true : undefined), 'the server to close the connections after the role change', 10_000).catch(() =>
+      failures.push(`still open after the role change: ${openOf('other session', kept).join(', ')}`)
+    );
+    const again = await openSocket({ token: second.token });
+    if (again.refused) failures.push(`positive control: the open session cannot reconnect after the role change (${again.refused.code})`);
+
+    // A session ended by another process (no immediate disconnection): the next room:join is refused and closes the socket.
+    withTestDb(
+      `await db.collection('refreshtokens').deleteMany({ user: new mongoose.Types.ObjectId(process.env.CL_USER) });`,
+      { CL_USER: person.id }
+    );
+    const ack = await joinRoom(again, `trip:${'0'.repeat(24)}`);
+    if (ack?.error !== 'AUTH_REQUIRED') failures.push(`room:join after the session ended elsewhere: ${JSON.stringify(ack)}`);
+    await waitFor(async () => (again.closed ? true : undefined), 'the server to close the connection of a session ended elsewhere', 10_000).catch(() =>
+      failures.push('the connection of a session ended elsewhere stayed open after room:join')
+    );
+    expect(failures).toEqual([]);
+  });
+
+  // ---------- carpooling
+
+  test('carpool: exact coordinates only reach the driver and the accepted passengers (about 1 km for everyone else, search included)', async () => {
+    const admin = w.admin.token;
+    const [driver, passenger, pending, outsider] = await Promise.all([
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+    ]);
+    const trip = await offerTrip(driver);
+    const back = await offerTrip(driver, { direction: 'FROM_CAMPUS', departure: undefined, destination: { label: 'Ariana', ...EXACT_POINT } });
+    const accepted = await requestSeat(passenger, trip.id);
+    await acceptSeat(driver, accepted);
+    const pendingAnswer = await call('POST', `/api/carpool/trips/${trip.id}/requests`, { token: pending.token, json: { seats: 1 } });
+    expect(pendingAnswer.status, pendingAnswer.text).toBe(201);
+
+    const failures: string[] = [];
+    const exact = (label: string, res: Res, json: any, end = 'departure') => {
+      const place = json?.[end];
+      if (json?.exactLocation !== true || place?.lat !== EXACT_POINT.lat || place?.lng !== EXACT_POINT.lng) failures.push(`${label}: ${res.status} ${JSON.stringify(place)}`);
+    };
+    const rounded = (label: string, res: Res, json: any, end = 'departure') => {
+      const place = json?.[end];
+      if (!json) failures.push(`${label}: trip missing (${res.status} ${res.body?.code ?? ''})`);
+      else if (json.exactLocation !== false || place?.lat !== ROUNDED_POINT.lat || place?.lng !== ROUNDED_POINT.lng) failures.push(`${label}: ${JSON.stringify(place)}`);
+      if (EXACT_DIGITS.test(res.text)) failures.push(`${label}: the exact coordinates are in the answer`);
+    };
+    const get = (person: Person, url: string) => call('GET', url, { token: person.token });
+    const detail = `/api/carpool/trips/${trip.id}`;
+    let res = await get(driver, detail);
+    exact('driver', res, res.body);
+    res = await get(passenger, detail);
+    exact('accepted passenger', res, res.body);
+    for (const [who, person] of [['pending passenger', pending], ['other student', outsider], ['admin', w.admin]] as const) {
+      res = await get(person, detail);
+      rounded(who, res, res.body);
+    }
+    rounded('answer to the pending request', pendingAnswer, pendingAnswer.body.trip);
+    res = await get(pending, '/api/carpool/me/trips?role=passenger&limit=100');
+    rounded('pending passenger /me/trips', res, (res.body.items as any[])?.find((item) => item.id === trip.id));
+    // Search next to the exact address: found, rounded; the distance is computed from the rounded point.
+    res = await get(outsider, `/api/carpool/trips?lat=${EXACT_POINT.lat}&lng=${EXACT_POINT.lng}&radiusKm=2&limit=100`);
+    rounded('search by location', res, (res.body.items as any[])?.find((item) => item.id === trip.id));
+    res = await get(outsider, '/api/carpool/trips?limit=100');
+    rounded('search without location', res, (res.body.items as any[])?.find((item) => item.id === trip.id));
+    // The arrival of a trip leaving the campus is protected the same way.
+    res = await get(outsider, `/api/carpool/trips/${back.id}`);
+    rounded('FROM_CAMPUS trip, other student', res, res.body, 'destination');
+    res = await get(driver, `/api/carpool/trips/${back.id}`);
+    exact('FROM_CAMPUS trip, driver', res, res.body, 'destination');
+    // A passenger who gives up the seat goes back to the rounded view.
+    expect((await call('POST', `/api/carpool/requests/${accepted}/cancel`, { token: passenger.token })).status).toBe(200);
+    res = await get(passenger, detail);
+    rounded('former passenger', res, res.body);
+    expect(failures).toEqual([]);
+  });
+
+  test('carpool: only students drive, book, chat and rate; drivers answer their own requests; seatsLeft, status, driver and ratings cannot be forged', async () => {
+    const admin = w.admin.token;
+    const [driver, passenger, outsider] = await Promise.all([createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT')]);
+    const trip = await offerTrip(driver, { notes: 'Original notes' });
+    const tripUrl = `/api/carpool/trips/${trip.id}`;
+    const requestId = await requestSeat(passenger, trip.id);
+    const newTrip = { departure: { label: 'Ariana', ...EXACT_POINT }, departureAt: `${campusDay(3)}T08:00`, seats: 2 };
+    const studentOnly: Endpoint[] = [
+      { method: 'POST', path: '/api/carpool/trips', json: newTrip },
+      { method: 'PATCH', path: tripUrl, json: { notes: 'Hacked' } },
+      { method: 'GET', path: `${tripUrl}/requests` },
+      { method: 'POST', path: `${tripUrl}/requests`, json: { seats: 1 } },
+      { method: 'POST', path: `/api/carpool/requests/${requestId}/accept` },
+      { method: 'POST', path: `/api/carpool/requests/${requestId}/decline`, json: {} },
+      { method: 'POST', path: `/api/carpool/requests/${requestId}/cancel` },
+      { method: 'GET', path: `${tripUrl}/messages` },
+      { method: 'POST', path: `${tripUrl}/messages`, json: { body: 'Hacked' } },
+      { method: 'POST', path: `${tripUrl}/ratings`, json: { userId: driver.id, score: 1 } },
+    ];
+    const reads: Endpoint[] = [
+      { method: 'GET', path: '/api/carpool/trips' },
+      { method: 'GET', path: tripUrl },
+      { method: 'GET', path: '/api/carpool/me/trips' },
+      { method: 'POST', path: `${tripUrl}/cancel`, json: { reason: 'Hacked' } },
+    ];
+    const failures: string[] = [];
+    const attempt = async (who: string, token: string | undefined, ep: Endpoint, status: number, code: string) =>
+      expectAnswer(failures, `${who} ${ep.method} ${ep.path}`, await call(ep.method, ep.path, { token, json: ep.json }), status, code);
+    const open: Endpoint[] = [{ method: 'GET', path: '/api/carpool/places' }, { method: 'GET', path: '/api/carpool/settings' }];
+    for (const ep of [...studentOnly, ...reads, ...open]) await attempt('anonymous', undefined, ep, 401, 'AUTH_REQUIRED');
+    for (const ep of [...studentOnly, ...reads]) {
+      await attempt('TEACHER', w.teacher1.token, ep, 403, 'FORBIDDEN');
+      await attempt('ALUMNI', w.alumni.token, ep, 403, 'FORBIDDEN');
+    }
+    for (const ep of studentOnly) await attempt('ADMIN', admin, ep, 403, 'FORBIDDEN');
+    // Another student is not the driver: 403 on the trip, 404 on its requests (they cannot see them).
+    for (const ep of [studentOnly[1], studentOnly[2], reads[3]]) await attempt('other student', outsider.token, ep, 403, 'FORBIDDEN');
+    for (const ep of studentOnly.slice(4, 7)) await attempt('other student', outsider.token, ep, 404, 'RESOURCE_NOT_FOUND');
+    // The passenger cannot answer their own request; the driver cannot cancel it for them.
+    await attempt('passenger', passenger.token, studentOnly[4], 403, 'FORBIDDEN');
+    await attempt('driver', driver.token, studentOnly[6], 403, 'FORBIDDEN');
+    expect(failures).toEqual([]);
+    const kept = await call('GET', tripUrl, { token: driver.token });
+    expect(kept.body).toMatchObject({ notes: 'Original notes', status: 'OPEN', seatsLeft: 3, cancelReason: null });
+    expect((kept.body.requests as any[]).find((item) => item.id === requestId)).toMatchObject({ status: 'PENDING' });
+
+    // Mass assignment: the server computes seatsLeft, status, driver, ratings and the search point.
+    const forged = {
+      seatsLeft: 6,
+      status: 'FULL',
+      driver: outsider.id,
+      driverSnapshot: { firstname: 'Ada', lastname: 'Admin' },
+      rating: 5,
+      ratingCount: 99,
+      exactLocation: true,
+      searchPoint: { type: 'Point', coordinates: [0, 0] },
+      myRole: 'DRIVER',
+      cancelledBy: 'ADMIN',
+      cancelReason: 'Forged',
+      completedAt: new Date().toISOString(),
+      source: 'SEED',
+      createdAt: '2000-01-01T00:00:00.000Z',
+      id: w.admin.id,
+      _id: w.admin.id,
+    };
+    const created = await call('POST', '/api/carpool/trips', { token: driver.token, json: { ...newTrip, pricePerSeat: 1, ...forged } });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body).toMatchObject({
+      status: 'OPEN',
+      seats: 2,
+      seatsLeft: 2,
+      cancelledBy: null,
+      cancelReason: null,
+      driver: { id: driver.id, rating: null, ratingCount: 0 },
+    });
+    expect(created.body.id).not.toBe(w.admin.id);
+    expect(new Date(created.body.createdAt).getUTCFullYear()).toBeGreaterThan(2000);
+    const near = async (lat: number, lng: number) =>
+      ((await call('GET', `/api/carpool/trips?lat=${lat}&lng=${lng}&radiusKm=20&limit=100`, { token: outsider.token })).body.items as any[]).map((item) => item.id);
+    expect(await near(0, 0), 'the trip is found at the forged search point').not.toContain(created.body.id);
+    expect(await near(EXACT_POINT.lat, EXACT_POINT.lng)).toContain(created.body.id);
+    expectAnswer(failures, 'PATCH with forged fields only', await call('PATCH', `/api/carpool/trips/${created.body.id}`, { token: driver.token, json: forged }), 400, 'NO_CHANGES');
+    const forgedRequest = await call('POST', `/api/carpool/trips/${created.body.id}/requests`, {
+      token: passenger.token,
+      json: { seats: 1, status: 'ACCEPTED', passenger: outsider.id, trip: trip.id, active: false, decidedAt: new Date().toISOString(), cancelledBy: 'TRIP' },
+    });
+    expect(forgedRequest.status, forgedRequest.text).toBe(201);
+    expect(forgedRequest.body).toMatchObject({ status: 'PENDING', tripId: created.body.id, passenger: { id: passenger.id }, decidedAt: null, cancelledBy: null });
+    expect(forgedRequest.body.trip).toMatchObject({ seatsLeft: 2, myRole: null, exactLocation: false });
+
+    // Ratings after the trip: rater and roles come from the server, once per rated participant.
+    await acceptSeat(driver, requestId);
+    withTestDb(
+      `await db.collection('trips').updateOne({ _id: new mongoose.Types.ObjectId(process.env.CL_TRIP) }, { $set: { departureAt: new Date(Date.now() - 2 * 3600 * 1000) } });`,
+      { CL_TRIP: trip.id }
+    );
+    const rate = (person: Person, json: Record<string, unknown>) => call('POST', `${tripUrl}/ratings`, { token: person.token, json });
+    const rated = await rate(passenger, {
+      userId: driver.id,
+      score: 5,
+      comment: 'Great driver',
+      rater: outsider.id,
+      raterId: outsider.id,
+      raterRole: 'DRIVER',
+      rateeRole: 'PASSENGER',
+      trip: created.body.id,
+      createdAt: '2000-01-01T00:00:00.000Z',
+    });
+    expect(rated.status, rated.text).toBe(201);
+    expect(rated.body).toMatchObject({ tripId: trip.id, raterId: passenger.id, rateeId: driver.id, raterRole: 'PASSENGER', rateeRole: 'DRIVER', score: 5 });
+    expectAnswer(failures, 'second rating of the same participant', await rate(passenger, { userId: driver.id, score: 1 }), 409, 'ALREADY_RATED');
+    expect(outcomes(await Promise.all([1, 2, 3].map(() => rate(driver, { userId: passenger.id, score: 4 }))))).toEqual(['201', '409 ALREADY_RATED', '409 ALREADY_RATED']);
+    expectAnswer(failures, 'a non-participant rates', await rate(outsider, { userId: driver.id, score: 1 }), 403, 'FORBIDDEN');
+    expectAnswer(failures, 'rating oneself', await rate(driver, { userId: driver.id, score: 5 }), 400, 'VALIDATION_ERROR');
+    expectAnswer(failures, 'rating a non-participant', await rate(passenger, { userId: outsider.id, score: 5 }), 400, 'VALIDATION_ERROR');
+    for (const score of [6, 0, 4.5, { $gt: 0 }, [5]]) {
+      expectAnswer(failures, `score ${JSON.stringify(score)}`, await rate(driver, { userId: passenger.id, score }), 400, 'VALIDATION_ERROR');
+    }
+    expect(failures).toEqual([]);
+    const after = await call('GET', tripUrl, { token: outsider.token });
+    expect(after.body.driver).toMatchObject({ id: driver.id, rating: 5, ratingCount: 1 });
+  });
+
+  test('carpool: simultaneous seat requests and accepts never overbook a trip, and a seat is given back only once', async () => {
+    const admin = w.admin.token;
+    const [driver, ...riders] = await Promise.all(Array.from({ length: 10 }, () => createUser(admin, 'STUDENT')));
+    // Five passengers for two seats: the driver accepts all of them at once.
+    const small = await offerTrip(driver, { seats: 2 });
+    const smallRequests: string[] = [];
+    for (const rider of riders.slice(0, 5)) smallRequests.push(await requestSeat(rider, small.id));
+    const accepts = await Promise.all(smallRequests.map((id) => call('POST', `/api/carpool/requests/${id}/accept`, { token: driver.token })));
+    expect(outcomes(accepts)).toEqual(['200', '200', '409 TRIP_FULL', '409 TRIP_FULL', '409 TRIP_FULL']);
+    const full = await call('GET', `/api/carpool/trips/${small.id}`, { token: driver.token });
+    expect(full.body).toMatchObject({ seats: 2, seatsLeft: 0, status: 'FULL' });
+    expect((full.body.requests as any[]).filter((item) => item.status === 'ACCEPTED')).toHaveLength(2);
+
+    // An accepted passenger cancels three times at once: the seat comes back once.
+    const index = accepts.findIndex((res) => res.status === 200);
+    const cancels = await Promise.all([0, 1, 2].map(() => call('POST', `/api/carpool/requests/${smallRequests[index]}/cancel`, { token: riders[index].token })));
+    expect(outcomes(cancels)).toEqual(['200', '409 INVALID_STATE', '409 INVALID_STATE']);
+    expect((await call('GET', `/api/carpool/trips/${small.id}`, { token: driver.token })).body).toMatchObject({ seatsLeft: 1, status: 'OPEN' });
+
+    // Three requests of two seats for three seats: one accepted.
+    const big = await offerTrip(driver, { seats: 3 });
+    const bigRequests: string[] = [];
+    for (const rider of riders.slice(5, 8)) bigRequests.push(await requestSeat(rider, big.id, 2));
+    const bigAccepts = await Promise.all(bigRequests.map((id) => call('POST', `/api/carpool/requests/${id}/accept`, { token: driver.token })));
+    expect(outcomes(bigAccepts)).toEqual(['200', '409 TRIP_FULL', '409 TRIP_FULL']);
+    expect((await call('GET', `/api/carpool/trips/${big.id}`, { token: driver.token })).body).toMatchObject({ seatsLeft: 1, status: 'OPEN' });
+
+    // The same request sent six times at once: one request.
+    const repeated = await Promise.all(Array.from({ length: 6 }, () => call('POST', `/api/carpool/trips/${big.id}/requests`, { token: riders[8].token, json: { seats: 1 } })));
+    const results = outcomes(repeated);
+    expect(countOf(results, '201'), results.join(' | ')).toBe(1);
+    expect(countOf(results, '409 ALREADY_REQUESTED'), results.join(' | ')).toBe(5);
+  });
+
+  // ---------- notes marketplace
+
+  test('marketplace: a premium file only reaches its buyers, its author and admins; documents that are not published are invisible (404) to everyone else', async () => {
+    const admin = w.admin.token;
+    const [author, buyer, outsider] = await Promise.all([createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT')]);
+    const marker = `doc${rand()}`;
+    const premium = await marketDocument(author, 20, `${marker} premium`);
+    const free = await marketDocument(author, 0, `${marker} free`);
+    const hidden: Record<string, string> = {
+      PENDING_REVIEW: await marketDocument(author, 5, `${marker} pending`, 'PENDING_REVIEW'),
+      REJECTED: await marketDocument(author, 5, `${marker} rejected`, 'REJECTED'),
+      UNPUBLISHED: await marketDocument(author, 5, `${marker} unpublished`, 'UNPUBLISHED'),
+    };
+    const failures: string[] = [];
+    const download = (person: Person, id: string) => call('GET', `/api/marketplace/documents/${id}/file`, { token: person.token, headers: { Accept: '*/*' } });
+    const others: Record<string, Person> = { buyer, 'other student': outsider, teacher: w.teacher1, alumni: w.alumni };
+
+    for (const [who, person] of Object.entries(others)) expectAnswer(failures, `${who} downloads the premium file before buying`, await download(person, premium), 404, 'RESOURCE_NOT_FOUND');
+    for (const [who, person] of [['author', author], ['admin', w.admin]] as const) {
+      const res = await download(person, premium);
+      if (res.status !== 200 || !res.text.includes(`${marker} premium`)) failures.push(`${who} downloads the premium file: ${res.status}`);
+    }
+    const bought = await call('POST', `/api/marketplace/documents/${premium}/purchase`, { token: buyer.token, json: { expectedPrice: 20 } });
+    expect(bought.status, bought.text).toBe(201);
+    const own = await download(buyer, premium);
+    expect(own.status).toBe(200);
+    expect(own.text).toContain(`${marker} premium`);
+    expect(own.headers['content-disposition']).toMatch(/^attachment;/);
+    expect(own.headers['x-content-type-options']).toBe('nosniff');
+    expect(own.headers['cache-control']).toMatch(/no-store/);
+    for (const [who, person] of [['other student', outsider], ['teacher', w.teacher1]] as const) {
+      expectAnswer(failures, `${who} downloads the premium file after someone bought it`, await download(person, premium), 404, 'RESOURCE_NOT_FOUND');
+    }
+    expect((await download(outsider, free)).status).toBe(200);
+
+    for (const [status, id] of Object.entries(hidden)) {
+      const base = `/api/marketplace/documents/${id}`;
+      const blocked: [string, string, unknown][] = [
+        ['GET', base, undefined],
+        ['GET', `${base}/file`, undefined],
+        ['GET', `${base}/reviews`, undefined],
+        ['POST', `${base}/purchase`, {}],
+        ['POST', `${base}/report`, { reason: 'Looks copied from a book' }],
+        ['PUT', `${base}/review`, { rating: 5 }],
+        ['PATCH', base, { price: 0 }],
+        ['DELETE', base, undefined],
+      ];
+      for (const [who, person] of Object.entries(others)) {
+        for (const [method, url, json] of blocked) {
+          expectAnswer(failures, `${who} ${method} ${status} ${url.slice(base.length) || '/'}`, await call(method, url, { token: person.token, json }), 404, 'RESOURCE_NOT_FOUND');
+        }
+      }
+      for (const [who, person] of [['author', author], ['admin', w.admin]] as const) expectAnswer(failures, `${who} GET ${status}`, await call('GET', base, { token: person.token }), 200);
+    }
+    const listed = async (person: Person, query: string) => {
+      const res = await call('GET', `/api/marketplace/documents?${query}`, { token: person.token });
+      if (res.status !== 200) failures.push(`${query}: ${res.status} ${res.body?.code}`);
+      return ((res.body?.items as any[]) ?? []).map((item) => item.id as string);
+    };
+    for (const [who, person] of Object.entries(others)) {
+      for (const query of [`q=${marker}&limit=100`, `author=${author.id}&limit=100`, 'purchased=true&limit=100', 'sort=oldest&limit=100']) {
+        const ids = await listed(person, query);
+        for (const [status, id] of Object.entries(hidden)) if (ids.includes(id)) failures.push(`${who} lists the ${status} document (${query})`);
+      }
+      expectAnswer(failures, `${who} filters by status`, await call('GET', '/api/marketplace/documents?status=PENDING_REVIEW,REJECTED,UNPUBLISHED', { token: person.token }), 403, 'FORBIDDEN');
+      const mine = await listed(person, 'mine=true&status=PENDING_REVIEW,REJECTED,UNPUBLISHED&limit=100');
+      if (Object.values(hidden).some((id) => mine.includes(id))) failures.push(`${who} sees the author's documents with mine=true`);
+    }
+    expect(failures).toEqual([]);
+    // Positive controls.
+    expect(await listed(outsider, `q=${marker}&limit=100`)).toEqual(expect.arrayContaining([premium, free]));
+    expect(await listed(author, 'mine=true&limit=100')).toEqual(expect.arrayContaining(Object.values(hidden)));
+  });
+
+  test('marketplace: purchases never double-charge nor go below zero, the price is the server\'s, sellers never learn who bought, and wallets have no write route', async () => {
+    const admin = w.admin.token;
+    const richName = `Rich${rand()}`;
+    const [author, seller, buyer, rich] = await Promise.all([
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'TEACHER'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT', undefined, { lastname: richName }),
+    ]);
+    const marker = `wallet${rand()}`;
+    const premium = await marketDocument(author, 20, `${marker} premium`);
+    const free = await marketDocument(author, 0, `${marker} free`);
+    const pending = await marketDocument(author, 10, `${marker} pending`, 'PENDING_REVIEW');
+    const failures: string[] = [];
+    const buy = (person: Person, id: string, json: unknown = {}) => call('POST', `/api/marketplace/documents/${id}/purchase`, { token: person.token, json });
+
+    expect((await walletOf(buyer)).balance).toBe(100);
+    expectAnswer(failures, "buying one's own document", await buy(author, premium), 403, 'FORBIDDEN');
+    expectAnswer(failures, 'buying a free document', await buy(buyer, free), 409, 'INVALID_STATE');
+    expectAnswer(failures, 'buying a document under review', await buy(buyer, pending), 404, 'RESOURCE_NOT_FOUND');
+    expectAnswer(failures, 'buying at another price', await buy(buyer, premium, { expectedPrice: 0 }), 409, 'PRICE_CHANGED');
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      for (const url of ['/api/marketplace/wallet', '/api/marketplace/wallet/transactions']) {
+        const res = await call(method, url, { token: buyer.token, json: { balance: 9999, amount: 9999, type: 'STARTING_BONUS' } });
+        if (res.status !== 404) failures.push(`${method} ${url} -> ${res.status}`);
+      }
+    }
+    expect((await walletOf(buyer)).balance).toBe(100);
+
+    // The price, the buyer and the state come from the server.
+    const bought = await buy(buyer, premium, { expectedPrice: 20, price: 0, amount: 0, balance: 9999, buyer: rich.id, buyerId: rich.id, kind: 'FREE', state: 'COMPLETED' });
+    expect(bought.status, bought.text).toBe(201);
+    expect(bought.body).toMatchObject({ balance: 80, purchase: { price: 20, documentId: premium, kind: 'PURCHASE' } });
+    expect((await call('GET', `/api/marketplace/wallet?user=${author.id}&userId=${author.id}`, { token: buyer.token })).body.balance).toBe(80);
+    expect((await walletOf(rich)).balance).toBe(100);
+
+    // The same purchase ten times at once: one charge.
+    const second = await marketDocument(author, 15, `${marker} second`);
+    const repeated = outcomes(await Promise.all(Array.from({ length: 10 }, () => buy(buyer, second))));
+    expect(countOf(repeated, '201'), repeated.join(' | ')).toBe(1);
+    expect(countOf(repeated, '409 ALREADY_PURCHASED'), repeated.join(' | ')).toBe(9);
+    expect((await walletOf(buyer)).balance).toBe(65);
+
+    // Three 50-token documents bought three times each, all at once, with 100 tokens: two purchases, balance 0.
+    const expensive = [await marketDocument(seller, 50, `${marker} one`), await marketDocument(seller, 50, `${marker} two`), await marketDocument(seller, 50, `${marker} three`)];
+    const race = outcomes(await Promise.all(expensive.flatMap((id) => [0, 1, 2].map(() => buy(rich, id)))));
+    expect(countOf(race, '201'), race.join(' | ')).toBe(2);
+    expect(race.filter((item) => !['201', '409 ALREADY_PURCHASED', '409 INSUFFICIENT_TOKENS'].includes(item)), race.join(' | ')).toEqual([]);
+    const wallet = await walletOf(rich);
+    expect(wallet.balance).toBe(0);
+    expect(wallet.transactions.reduce((sum, item) => sum + item.amount, 0)).toBe(wallet.balance);
+    expect(wallet.transactions.filter((item) => item.type === 'PURCHASE').map((item) => item.amount)).toEqual([-50, -50]);
+    expect(wallet.transactions.every((item) => item.balanceAfter === null || item.balanceAfter >= 0)).toBe(true);
+
+    // The seller is credited exactly once per sale and never learns who bought.
+    const sales = await call('GET', '/api/marketplace/wallet?limit=100', { token: seller.token });
+    expect(sales.body.balance).toBe(200);
+    expect((sales.body.transactions as any[]).filter((item) => item.type === 'SALE').map((item) => item.amount)).toEqual([50, 50]);
+    const buyerTraces = { "the buyer's id": rich.id, "the buyer's name": richName, "the buyer's e-mail": rich.email };
+    mentions(failures, "the seller's wallet", sales, buyerTraces);
+    const notified = await waitFor(async () => {
+      const res = await call('GET', '/api/notifications?limit=100', { token: seller.token });
+      return (res.body.items as any[]).filter((item) => item.type === 'MARKETPLACE' && item.data?.kind === 'SALE').length >= 2 ? res : undefined;
+    }, "the seller's sale notifications");
+    mentions(failures, "the seller's notifications", notified, buyerTraces);
+    expect(failures).toEqual([]);
+  });
+
+  test('marketplace: uploads check the file and ignore forged fields; only buyers and downloaders review, once; authors never review their own documents', async () => {
+    const admin = w.admin.token;
+    const [author, buyer, reader, outsider] = await Promise.all([createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT')]);
+    const marker = `review${rand()}`;
+    const failures: string[] = [];
+
+    const forged = {
+      status: 'PUBLISHED',
+      author: w.admin.id,
+      authorSnapshot: { firstname: 'Ada', lastname: 'Admin' },
+      rating: 5,
+      ratingSum: 50,
+      ratingCount: 10,
+      downloads: 999,
+      sales: 9,
+      purchasesInFlight: 0,
+      file: { key: '../../../backend/.env', filename: 'env.txt', size: 1, mimeType: 'text/plain' },
+      publishedAt: '2000-01-01T00:00:00.000Z',
+      rejectionReason: 'Forged',
+      purchased: true,
+      id: w.admin.id,
+      _id: w.admin.id,
+      createdAt: '2000-01-01T00:00:00.000Z',
+    };
+    const uploaded = await uploadDocument(author, { title: `Forged ${marker}`, price: 10, ...forged }, [file(`${marker}.pdf`, 'application/pdf', pdf(marker))]);
+    expect(uploaded.status, uploaded.text).toBe(201);
+    expect(uploaded.body).toMatchObject({
+      status: 'PENDING_REVIEW',
+      author: { id: author.id },
+      rating: 0,
+      ratingCount: 0,
+      downloads: 0,
+      publishedAt: null,
+      rejectionReason: null,
+      file: { filename: `${marker}.pdf`, mimeType: 'application/pdf' },
+    });
+    expect(uploaded.body.id).not.toBe(w.admin.id);
+    expect(new Date(uploaded.body.createdAt).getUTCFullYear()).toBeGreaterThan(2000);
+    expectAnswer(failures, 'PATCH with forged fields only', await call('PATCH', `/api/marketplace/documents/${uploaded.body.id}`, { token: author.token, json: forged }), 400, 'NO_CHANGES');
+    expectAnswer(failures, 'other student approves', await call('POST', `/api/marketplace/documents/${uploaded.body.id}/approve`, { token: outsider.token }), 403, 'FORBIDDEN');
+
+    const rejected = `rejected-${rand()}`;
+    const refused: [string, File[], number, string][] = [
+      ['HTML named .pdf', [file('notes.pdf', 'application/pdf', `<html><script>alert(1)</script>${rejected}</html>`)], 415, 'UNSUPPORTED_FILE_TYPE'],
+      ['SVG', [file('notes.svg', 'image/svg+xml', `<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)">${rejected}</svg>`)], 415, 'UNSUPPORTED_FILE_TYPE'],
+      ['executable', [file('notes.exe', 'application/x-msdownload', `MZ ${rejected}`)], 415, 'UNSUPPORTED_FILE_TYPE'],
+      ['text file', [file('notes.txt', 'text/plain', rejected)], 415, 'UNSUPPORTED_FILE_TYPE'],
+      ['real PDF named .html', [file('notes.html', 'application/pdf', pdf(rejected))], 415, 'UNSUPPORTED_FILE_TYPE'],
+      ['two files', [file('a.pdf', 'application/pdf', pdf(rejected)), file('b.pdf', 'application/pdf', pdf(rejected))], 400, 'TOO_MANY_FILES'],
+    ];
+    for (const [label, files, status, code] of refused) expectAnswer(failures, label, await uploadDocument(author, { title: `Refused ${marker}` }, files), status, code);
+    expectAnswer(failures, 'ALUMNI upload', await uploadDocument(w.alumni, { title: `Alumni ${marker}` }, [file('a.pdf', 'application/pdf', pdf(rejected))]), 403, 'FORBIDDEN');
+    expect(listFiles(STORAGE_DIR).filter((item) => fs.readFileSync(item).includes(rejected)), 'refused files must not be stored').toEqual([]);
+
+    // Reviews: buyers (premium) and downloaders (free), never the author, one per user.
+    const premium = await marketDocument(author, 10, `${marker} premium`);
+    const free = await marketDocument(author, 0, `${marker} free`);
+    const review = (person: Person, id: string, json: Record<string, unknown>) => call('PUT', `/api/marketplace/documents/${id}/review`, { token: person.token, json });
+    const refusedReview = (label: string, res: Res, reason: string) => {
+      expectAnswer(failures, label, res, 403, 'FORBIDDEN');
+      if (res.status === 403 && res.body?.details?.reason !== reason) failures.push(`${label}: reason ${res.body?.details?.reason}`);
+    };
+    refusedReview('review without buying', await review(outsider, premium, { rating: 1 }), 'NOT_ACQUIRED');
+    refusedReview("author reviews their own document", await review(author, premium, { rating: 5 }), 'OWN_DOCUMENT');
+    refusedReview('review of a free document never downloaded', await review(reader, free, { rating: 1 }), 'NOT_ACQUIRED');
+    expect((await call('POST', `/api/marketplace/documents/${premium}/purchase`, { token: buyer.token, json: {} })).status).toBe(201);
+    const first = await review(buyer, premium, { rating: 4, comment: '$set', author: outsider.id, documentId: free, ratingCount: 99, editedAt: '2000-01-01T00:00:00.000Z', id: w.admin.id });
+    expect(first.status, first.text).toBe(201);
+    expect(first.body).toMatchObject({ documentId: premium, author: { id: buyer.id }, rating: 4, comment: '$set', editedAt: null });
+    const edits = await Promise.all([5, 3, 2, 1, 5].map((rating) => review(buyer, premium, { rating, comment: '$inc' })));
+    if (edits.some((res) => res.status !== 200)) failures.push(`concurrent edits: ${outcomes(edits).join(' | ')}`);
+    const doc = await call('GET', `/api/marketplace/documents/${premium}`, { token: outsider.token });
+    expect(doc.body.ratingCount).toBe(1);
+    expect(doc.body.rating).toBeGreaterThanOrEqual(1);
+    expect(doc.body.rating).toBeLessThanOrEqual(5);
+    const reviews = await call('GET', `/api/marketplace/documents/${premium}/reviews`, { token: outsider.token });
+    expect(reviews.body.total).toBe(1);
+    expect(reviews.body.items[0]).toMatchObject({ author: { id: buyer.id }, comment: '$inc' });
+    // Downloading a free document gives the right to review it.
+    expect((await call('GET', `/api/marketplace/documents/${free}/file`, { token: reader.token, headers: { Accept: '*/*' } })).status).toBe(200);
+    expect((await review(reader, free, { rating: 5 })).status).toBe(201);
+    expectAnswer(failures, 'author reports their own document', await call('POST', `/api/marketplace/documents/${premium}/report`, { token: author.token, json: { reason: 'Reporting myself' } }), 403, 'FORBIDDEN');
+    for (const ep of [`/api/marketplace/documents/${premium}/approve`, `/api/marketplace/documents/${premium}/unpublish`, '/api/marketplace/reports']) {
+      for (const [who, person] of [['author', author], ['teacher', w.teacher1], ['alumni', w.alumni]] as const) {
+        const method = ep.endsWith('/reports') ? 'GET' : 'POST';
+        expectAnswer(failures, `${who} ${method} ${ep}`, await call(method, ep, { token: person.token, json: method === 'POST' ? { reason: 'Hacked' } : undefined }), 403, 'FORBIDDEN');
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  // ---------- alumni network
+
+  test('alumni: a PRIVATE profile is never listed nor readable by others, and CAMPUS needs an explicit consent the client cannot forge', async () => {
+    const admin = w.admin.token;
+    const marker = `skill${rand()}`;
+    const [hidden, student] = await Promise.all([createUser(admin, 'ALUMNI'), createUser(admin, 'STUDENT')]);
+    const listed = await listedAlumni();
+    const failures: string[] = [];
+    const put = (person: Person, json: unknown) => call('PUT', '/api/alumni/me', { token: person.token, json });
+
+    for (const json of [{ visibility: 'CAMPUS' }, { visibility: 'CAMPUS', consentAt: '2020-01-01T00:00:00.000Z' }, { visibility: 'CAMPUS', consent: false }, { visibility: 'CAMPUS', consent: 'yes' }]) {
+      const res = await put(hidden, { headline: `Private ${marker}`, ...json });
+      if (res.status !== 400 || res.body?.code !== 'VALIDATION_ERROR' || !res.body?.details?.consent) failures.push(`PUT ${JSON.stringify(json)} -> ${res.status} ${res.body?.code}`);
+    }
+    const saved = await put(hidden, {
+      headline: `Private ${marker}`,
+      skills: [marker],
+      company: `Company ${marker}`,
+      mentoringAvailable: true,
+      user: student.id,
+      id: w.admin.id,
+      _id: w.admin.id,
+      consentAt: '2020-01-01T00:00:00.000Z',
+      email: 'forged@campuslink.test',
+      updatedAt: '2000-01-01T00:00:00.000Z',
+    });
+    expect(saved.status, saved.text).toBe(200);
+    expect(saved.body).toMatchObject({ user: { id: hidden.id }, visibility: 'PRIVATE', consentAt: null, headline: `Private ${marker}` });
+    expect(saved.body.id).not.toBe(w.admin.id);
+    const profileId = saved.body.id as string;
+
+    const outsiders: Record<string, Person> = { student, teacher: w.teacher1, 'listed alumni': listed, 'alumni without profile': w.alumni };
+    for (const [who, person] of Object.entries(outsiders)) {
+      for (const [label, id] of [['profile id', profileId], ['user id', hidden.id]]) {
+        expectAnswer(failures, `${who} GET the private profile by ${label}`, await call('GET', `/api/alumni/${id}`, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+      }
+      for (const query of [`q=${marker}`, `skill=${marker}`, `q=Company%20${marker}`, 'mentoring=true&limit=100', 'sort=recent&limit=100']) {
+        const res = await call('GET', `/api/alumni?${query}`, { token: person.token });
+        expectAnswer(failures, `${who} directory ${query}`, res, 200);
+        mentions(failures, `${who} directory ${query}`, res, { 'the private profile': profileId, 'its marker': marker, "its owner's id": hidden.id });
+      }
+      mentions(failures, `${who} facets`, await call('GET', '/api/alumni/facets', { token: person.token }), { 'the private skill': marker });
+      expectAnswer(failures, `${who} support list`, await call('GET', '/api/alumni/admin/profiles', { token: person.token }), 403, 'FORBIDDEN');
+    }
+    expectAnswer(failures, 'a student asks the private profile for mentoring', await askMentoring(student, profileId), 404, 'RESOURCE_NOT_FOUND');
+    // Support: admins see it, marked as not listed.
+    expect((await call('GET', `/api/alumni/${profileId}`, { token: admin })).status).toBe(200);
+    const support = await call('GET', `/api/alumni/admin/profiles?q=${marker}`, { token: admin });
+    expect((support.body.items as any[]).find((item) => item.id === profileId)).toMatchObject({ listed: false, visibility: 'PRIVATE' });
+
+    // Withdrawing the consent hides a listed profile at once; listing it again needs a new consent.
+    expect((await call('GET', `/api/alumni/${listed.profileId}`, { token: student.token })).status).toBe(200);
+    expect((await put(listed, { consent: false })).body).toMatchObject({ visibility: 'PRIVATE', consentAt: null });
+    expectAnswer(failures, 'profile after the consent was withdrawn', await call('GET', `/api/alumni/${listed.profileId}`, { token: student.token }), 404, 'RESOURCE_NOT_FOUND');
+    expectAnswer(failures, 'CAMPUS again without a new consent', await put(listed, { visibility: 'CAMPUS' }), 400, 'VALIDATION_ERROR');
+    expect(failures).toEqual([]);
+  });
+
+  test('alumni: e-mails are only shared inside an accepted mentoring request, the export only holds the caller\'s data, and the erasure removes or anonymizes everything', async () => {
+    const admin = w.admin.token;
+    const leavingName = `Erased${rand()}`;
+    const [student, otherStudent, pendingMentee, acceptedMentee, otherAlumni] = await Promise.all([
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'ALUMNI'),
+    ]);
+    const mentor = await listedAlumni();
+    const leaving = await listedAlumni({ lastname: leavingName });
+    const failures: string[] = [];
+    const emails = { "the mentor's e-mail": mentor.email, "the student's e-mail": student.email };
+
+    const asked = await askMentoring(student, mentor.profileId);
+    expect(asked.status, asked.text).toBe(201);
+    expect(asked.body.contact).toBeNull();
+    mentions(failures, 'request answer', asked, emails);
+    const requestUrl = `/api/alumni/mentoring/${asked.body.id}`;
+    for (const [who, person] of [['mentor', mentor], ['student', student], ['admin', w.admin]] as const) {
+      const res = await call('GET', requestUrl, { token: person.token });
+      expectAnswer(failures, `${who} reads the pending request`, res, 200);
+      mentions(failures, `${who} pending request`, res, emails);
+    }
+    mentions(failures, "the mentor's list", await call('GET', '/api/alumni/mentoring?role=mentor', { token: mentor.token }), emails);
+    mentions(failures, "the mentor's profile", await call('GET', `/api/alumni/${mentor.profileId}`, { token: student.token }), emails);
+    for (const [who, person] of [['other student', otherStudent], ['other alumni', otherAlumni]] as const) {
+      expectAnswer(failures, `${who} reads it`, await call('GET', requestUrl, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+      expectAnswer(failures, `${who} accepts it`, await call('POST', `${requestUrl}/accept`, { token: person.token, json: {} }), 404, 'RESOURCE_NOT_FOUND');
+      expectAnswer(failures, `${who} closes it`, await call('POST', `${requestUrl}/close`, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+    }
+    expectAnswer(failures, 'the mentee accepts their own request', await call('POST', `${requestUrl}/accept`, { token: student.token, json: {} }), 403, 'FORBIDDEN');
+    expectAnswer(failures, 'an admin accepts it', await call('POST', `${requestUrl}/accept`, { token: admin, json: {} }), 403, 'FORBIDDEN');
+
+    // Accepted: both e-mails, for the two participants only (the body cannot set the contact or the status).
+    const accepted = await call('POST', `${requestUrl}/accept`, { token: mentor.token, json: { reply: 'Happy to help', status: 'CLOSED', contact: { mentorEmail: 'x@evil.example' } } });
+    expect(accepted.status, accepted.text).toBe(200);
+    const contact = { mentorEmail: mentor.email, menteeEmail: student.email };
+    expect(accepted.body).toMatchObject({ status: 'ACCEPTED', contact });
+    expect((await call('GET', requestUrl, { token: student.token })).body.contact).toEqual(contact);
+    const adminView = await call('GET', requestUrl, { token: admin });
+    expect(adminView.body.contact).toBeNull();
+    mentions(failures, 'admin view of the accepted request', adminView, emails);
+    expectAnswer(failures, 'other student after the acceptance', await call('GET', requestUrl, { token: otherStudent.token }), 404, 'RESOURCE_NOT_FOUND');
+    mentions(failures, "the mentor's profile after the acceptance", await call('GET', `/api/alumni/${mentor.profileId}`, { token: student.token }), emails);
+    const closed = await call('POST', `${requestUrl}/close`, { token: student.token });
+    expect(closed.body).toMatchObject({ status: 'CLOSED', contact: null });
+    mentions(failures, 'closed request', closed, emails);
+
+    // Export: the caller's own data only, whatever the query says.
+    const privateMarker = `private${rand()}`;
+    expect((await call('PUT', '/api/alumni/me', { token: otherAlumni.token, json: { headline: `Other ${privateMarker}` } })).status).toBe(200);
+    expect((await call('POST', '/api/alumni/posts', { token: mentor.token, json: { type: 'OTHER', body: `My own news ${rand()}` } })).status).toBe(201);
+    const exported = await call('GET', `/api/alumni/me/export?user=${otherAlumni.id}&userId=${otherAlumni.id}`, { token: mentor.token });
+    expect(exported.status, exported.text).toBe(200);
+    expect(exported.headers['content-disposition']).toMatch(/^attachment;/);
+    expect(exported.headers['cache-control']).toMatch(/no-store/);
+    expect(exported.body.user).toMatchObject({ id: mentor.id, email: mentor.email });
+    expect(exported.body.posts).toHaveLength(1);
+    mentions(failures, 'export', exported, {
+      "another alumni's id": otherAlumni.id,
+      "another alumni's profile": privateMarker,
+      "another alumni's e-mail": otherAlumni.email,
+      "the student's e-mail (request closed)": student.email,
+    });
+    for (const [who, person] of [['student', student], ['teacher', w.teacher1], ['admin', w.admin]] as const) {
+      expectAnswer(failures, `${who} export`, await call('GET', '/api/alumni/me/export', { token: person.token }), 403, 'FORBIDDEN');
+      expectAnswer(failures, `${who} erase`, await call('DELETE', '/api/alumni/me', { token: person.token }), 403, 'FORBIDDEN');
+    }
+
+    // Erasure: profile and posts deleted, the alumni's side of the mentoring history anonymized.
+    const postMarker = `farewell${rand()}`;
+    const replyMarker = `reply${rand()}`;
+    expect((await call('POST', '/api/alumni/posts', { token: leaving.token, json: { type: 'NEW_JOB', body: `New job ${postMarker}` } })).status).toBe(201);
+    const open = await askMentoring(pendingMentee, leaving.profileId);
+    const answered = await askMentoring(acceptedMentee, leaving.profileId);
+    expect([open.status, answered.status]).toEqual([201, 201]);
+    expect((await call('POST', `/api/alumni/mentoring/${answered.body.id}/accept`, { token: leaving.token, json: { reply: `Sure ${replyMarker}` } })).status).toBe(200);
+    const erased = await call('DELETE', '/api/alumni/me', { token: leaving.token });
+    expect(erased.status, erased.text).toBe(204);
+
+    const traces = {
+      "the erased alumni's id": leaving.id,
+      'their last name': leavingName,
+      'their e-mail': leaving.email,
+      'their reply': replyMarker,
+      'their post': postMarker,
+      'their profile id': leaving.profileId,
+    };
+    for (const [who, person] of [['pending mentee', pendingMentee], ['accepted mentee', acceptedMentee]] as const) {
+      const list = await call('GET', '/api/alumni/mentoring?role=mentee&limit=100', { token: person.token });
+      expect(list.status, list.text).toBe(200);
+      const item = (list.body.items as any[])[0];
+      if (!item || item.status !== 'CLOSED' || item.mentor !== null || item.contact !== null) failures.push(`${who}: ${JSON.stringify(item)}`);
+      mentions(failures, `${who} requests`, list, traces);
+    }
+    for (const [who, person] of [['student', pendingMentee], ['admin', w.admin]] as const) {
+      expectAnswer(failures, `${who} reads the erased profile`, await call('GET', `/api/alumni/${leaving.profileId}`, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+      mentions(failures, `${who} news wall`, await call('GET', '/api/alumni/posts?limit=100', { token: person.token }), traces);
+      mentions(failures, `${who} directory`, await call('GET', `/api/alumni?q=${leavingName}`, { token: person.token }), traces);
+    }
+    mentions(failures, 'support list', await call('GET', '/api/alumni/admin/profiles?limit=100', { token: admin }), traces);
+    const after = await call('GET', '/api/alumni/me/export', { token: leaving.token });
+    expect(after.body).toMatchObject({ profile: null, posts: [], mentoring: { asMentor: [], asMentee: [] } });
+    const left = Number(
+      withTestDb(
+        `const id = new mongoose.Types.ObjectId(process.env.CL_USER);
+        const counts = await Promise.all([
+          db.collection('alumniprofiles').countDocuments({ user: id }),
+          db.collection('alumniposts').countDocuments({ author: id }),
+          db.collection('mentoringrequests').countDocuments({ $or: [{ mentor: id }, { 'mentorSnapshot.lastname': process.env.CL_NAME }, { reply: { $regex: process.env.CL_REPLY } }] }),
+        ]);
+        process.stdout.write(String(counts.reduce((sum, value) => sum + value, 0)));`,
+        { CL_USER: leaving.id, CL_NAME: leavingName, CL_REPLY: replyMarker }
+      )
+    );
+    expect(left, 'documents of the erased alumni left in the database').toBe(0);
+    expect(failures).toEqual([]);
+  });
+
+  test('alumni and real-time: an admin deleting an ALUMNI account erases its posts, profile and mentoring traces, and closes its open connections', async () => {
+    const admin = w.admin.token;
+    const leavingName = `Deleted${rand()}`;
+    const [student, viewer] = await Promise.all([createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT')]);
+    const leaving = await listedAlumni({ lastname: leavingName });
+    const postMarker = `goodbye${rand()}`;
+    const replyMarker = `reply${rand()}`;
+    const posted = await call('POST', '/api/alumni/posts', { token: leaving.token, json: { type: 'NEW_JOB', body: `New job ${postMarker}` } });
+    expect(posted.status, posted.text).toBe(201);
+    const asked = await askMentoring(student, leaving.profileId);
+    expect(asked.status, asked.text).toBe(201);
+    const accepted = await call('POST', `/api/alumni/mentoring/${asked.body.id}/accept`, { token: leaving.token, json: { reply: `Sure ${replyMarker}` } });
+    expect(accepted.status, accepted.text).toBe(200);
+    const before = await call('GET', `/api/alumni/posts?author=${leaving.id}`, { token: viewer.token });
+    expect(before.body.total, before.text).toBe(1);
+    const live = { 'web (ticket)': await webSocketOf(leaving), 'mobile (access token)': await openSocket({ token: leaving.token }) };
+    for (const [label, item] of Object.entries(live)) expect(item.refused, label).toBeNull();
+
+    const deleted = await call('DELETE', `/api/users/${leaving.id}`, { token: admin });
+    expect(deleted.status, deleted.text).toBe(204);
+
+    const failures: string[] = [];
+    const traces = {
+      "the deleted alumni's id": leaving.id,
+      'their last name': leavingName,
+      'their post': postMarker,
+      'their reply': replyMarker,
+      'their profile id': leaving.profileId,
+    };
+    for (const [who, person] of [['student', viewer], ['admin', w.admin]] as const) {
+      const posts = await call('GET', `/api/alumni/posts?author=${leaving.id}`, { token: person.token });
+      expectAnswer(failures, `${who} lists the posts of the deleted account`, posts, 200);
+      if (posts.body?.total !== 0) failures.push(`${who}: ${posts.body?.total} post(s) of the deleted account still listed`);
+      mentions(failures, `${who} news wall`, await call('GET', '/api/alumni/posts?limit=100', { token: person.token }), traces);
+      mentions(failures, `${who} directory`, await call('GET', `/api/alumni?q=${leavingName}`, { token: person.token }), traces);
+      expectAnswer(failures, `${who} reads the deleted profile`, await call('GET', `/api/alumni/${leaving.profileId}`, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+    }
+    // The mentee keeps the request, closed and without anything of the deleted mentor.
+    const requests = await call('GET', '/api/alumni/mentoring?role=mentee&limit=100', { token: student.token });
+    expect(requests.status, requests.text).toBe(200);
+    const request = (requests.body.items as any[]).find((item) => item.id === asked.body.id);
+    if (!request || request.status !== 'CLOSED' || request.mentor !== null || request.contact !== null) failures.push(`mentee request after the deletion: ${JSON.stringify(request)}`);
+    mentions(failures, "the mentee's requests", requests, traces);
+    // Connections opened before the deletion are closed by the server (they would otherwise keep the trip rooms).
+    await waitFor(async () => (Object.values(live).every((item) => item.closed) ? true : undefined), 'the server to close the connections of the deleted account', 10_000).catch(() =>
+      failures.push(`connections still open after the deletion: ${Object.entries(live).filter(([, item]) => !item.closed).map(([label]) => label).join(', ')}`)
+    );
+    expect(failures).toEqual([]);
+  });
+
+  test('alumni: posts are plain text with https links only, hidden posts stay hidden, every route checks the role, and mentoring limits hold under concurrency', async () => {
+    const admin = w.admin.token;
+    const [author, other, student, second] = await Promise.all([
+      createUser(admin, 'ALUMNI'),
+      createUser(admin, 'ALUMNI'),
+      createUser(admin, 'STUDENT'),
+      createUser(admin, 'STUDENT'),
+    ]);
+    const listed = await listedAlumni();
+    const failures: string[] = [];
+    const marker = `post${rand()}`;
+    const html = `<img src=x onerror=alert('${marker}')><script>alert('${marker}')</script>`;
+    const post = (person: Person, json: Record<string, unknown>) => call('POST', '/api/alumni/posts', { token: person.token, json });
+
+    const created = await post(author, {
+      type: 'ACHIEVEMENT',
+      body: `${html}\nSecond line`,
+      link: 'https://example.com/news',
+      author: other.id,
+      authorSnapshot: { firstname: 'Ada', lastname: 'Admin' },
+      hidden: false,
+      hiddenReason: 'Forged',
+      hiddenBy: w.admin.id,
+      createdAt: '2000-01-01T00:00:00.000Z',
+      id: w.admin.id,
+    });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body).toMatchObject({ body: `${html}\nSecond line`, link: 'https://example.com/news', author: { id: author.id }, hidden: false, hiddenReason: null });
+    expect(created.body.id).not.toBe(w.admin.id);
+    const badLinks = ['javascript:alert(1)', 'JavaScript:alert(1)', ' javascript:alert(1)', 'http://example.com', 'data:text/html,<script>alert(1)</script>',
+      'https://user:pass@example.com', '//evil.example', 'vbscript:msgbox(1)', 'file:///etc/passwd', 'https://'];
+    for (const link of badLinks) {
+      const res = await post(author, { type: 'OTHER', body: 'A post with a bad link', link });
+      if (res.status !== 400 || res.body?.code !== 'VALIDATION_ERROR' || !res.body?.details?.link) failures.push(`link ${JSON.stringify(link)} -> ${res.status} ${res.body?.code}`);
+    }
+    for (const linkedinUrl of ['javascript:alert(1)', 'http://linkedin.com/in/x', 'https://linkedin.com.evil.example/in/x', 'https://evil.example/linkedin.com/in/x', 'https://user:pw@linkedin.com/in/x']) {
+      const res = await call('PUT', '/api/alumni/me', { token: author.token, json: { linkedinUrl } });
+      if (res.status !== 400 || !res.body?.details?.linkedinUrl) failures.push(`linkedinUrl ${linkedinUrl} -> ${res.status} ${res.body?.code}`);
+    }
+
+    // A hidden post: only its author and the admins see it.
+    expect((await call('POST', `/api/alumni/posts/${created.body.id}/hide`, { token: admin, json: { reason: 'Off topic' } })).status).toBe(200);
+    for (const [who, person] of [['student', student], ['other alumni', other], ['teacher', w.teacher1]] as const) {
+      for (const url of ['/api/alumni/posts?limit=100', `/api/alumni/posts?author=${author.id}&limit=100`, `/api/alumni/posts?author=${author.id}&hidden=true&limit=100`]) {
+        mentions(failures, `${who} GET ${url}`, await call('GET', url, { token: person.token }), { 'the hidden post': created.body.id });
+      }
+      expectAnswer(failures, `${who} deletes the hidden post`, await call('DELETE', `/api/alumni/posts/${created.body.id}`, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+    }
+    const mine = await call('GET', '/api/alumni/posts?author=me&limit=100', { token: author.token });
+    expect((mine.body.items as any[]).find((item) => item.id === created.body.id)).toMatchObject({ hidden: true, hiddenReason: 'Off topic' });
+    const visible = await post(other, { type: 'EVENT', body: 'Meetup next week on campus' });
+    expect(visible.status, visible.text).toBe(201);
+    expectAnswer(failures, 'a student deletes an alumni post', await call('DELETE', `/api/alumni/posts/${visible.body.id}`, { token: student.token }), 403, 'FORBIDDEN');
+    expectAnswer(failures, "an alumni deletes another alumni's post", await call('DELETE', `/api/alumni/posts/${visible.body.id}`, { token: author.token }), 403, 'FORBIDDEN');
+
+    // Roles.
+    const alumniOnly: Endpoint[] = [
+      { method: 'GET', path: '/api/alumni/me' },
+      { method: 'PUT', path: '/api/alumni/me', json: { headline: 'Hacked' } },
+      { method: 'GET', path: '/api/alumni/me/export' },
+      { method: 'DELETE', path: '/api/alumni/me' },
+      { method: 'POST', path: '/api/alumni/posts', json: { type: 'OTHER', body: 'A forbidden post body' } },
+    ];
+    const studentOnly: Endpoint[] = [{ method: 'POST', path: `/api/alumni/${listed.profileId}/mentoring`, json: { topic: 'Careers', message: MENTORING_MESSAGE } }];
+    const adminOnly: Endpoint[] = [
+      { method: 'GET', path: '/api/alumni/admin/profiles' },
+      { method: 'POST', path: `/api/alumni/posts/${visible.body.id}/hide`, json: { reason: 'Hacked' } },
+      { method: 'POST', path: `/api/alumni/posts/${created.body.id}/unhide` },
+    ];
+    const signedIn: Endpoint[] = [
+      { method: 'GET', path: '/api/alumni' },
+      { method: 'GET', path: '/api/alumni/facets' },
+      { method: 'GET', path: `/api/alumni/${listed.profileId}` },
+      { method: 'GET', path: '/api/alumni/mentoring' },
+      { method: 'GET', path: '/api/alumni/posts' },
+    ];
+    const attempt = async (who: string, token: string | undefined, ep: Endpoint, status: number, code: string) =>
+      expectAnswer(failures, `${who} ${ep.method} ${ep.path}`, await call(ep.method, ep.path, { token, json: ep.json }), status, code);
+    for (const ep of [...alumniOnly, ...studentOnly, ...adminOnly, ...signedIn]) await attempt('anonymous', undefined, ep, 401, 'AUTH_REQUIRED');
+    for (const ep of alumniOnly) for (const [who, person] of [['STUDENT', student], ['TEACHER', w.teacher1], ['ADMIN', w.admin]] as const) await attempt(who, person.token, ep, 403, 'FORBIDDEN');
+    for (const ep of studentOnly) for (const [who, person] of [['ALUMNI', other], ['TEACHER', w.teacher1], ['ADMIN', w.admin]] as const) await attempt(who, person.token, ep, 403, 'FORBIDDEN');
+    for (const ep of adminOnly) for (const [who, person] of [['STUDENT', student], ['TEACHER', w.teacher1], ['ALUMNI', other]] as const) await attempt(who, person.token, ep, 403, 'FORBIDDEN');
+    expect(failures).toEqual([]);
+    expect(((await call('GET', '/api/alumni/posts?limit=100', { token: student.token })).body.items as any[]).find((item) => item.id === visible.body.id)).toMatchObject({ hidden: false });
+
+    // Simultaneous mentoring requests: at most 3 pending per student, one per alumni.
+    const mentors = [listed, ...(await Promise.all([1, 2, 3, 4].map(() => listedAlumni())))];
+    expect(outcomes(await Promise.all(mentors.map((item) => askMentoring(student, item.profileId))))).toEqual([
+      '201',
+      '201',
+      '201',
+      '409 MENTORING_LIMIT_REACHED',
+      '409 MENTORING_LIMIT_REACHED',
+    ]);
+    expect(outcomes(await Promise.all(Array.from({ length: 4 }, () => askMentoring(second, mentors[0].profileId))))).toEqual([
+      '201',
+      '409 ALREADY_REQUESTED',
+      '409 ALREADY_REQUESTED',
+      '409 ALREADY_REQUESTED',
+    ]);
+  });
+
+  // ---------- injection and rate limits
+
+  test('NoSQL operators and regex payloads in the phase 3 bodies, queries and ids are rejected or neutralized', async () => {
+    const admin = w.admin.token;
+    const [driver, student, alumni] = await Promise.all([createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'ALUMNI')]);
+    const trip = await offerTrip(driver);
+    const doc = await marketDocument(driver, 5, `inject${rand()} notes`);
+    const listed = await listedAlumni();
+    const ne = { $ne: null };
+    const bodies: [string, string, string, unknown][] = [
+      [driver.token, 'POST', '/api/carpool/trips', { departure: { lat: { $gt: 0 }, lng: 10.1 }, departureAt: { $gt: '' }, seats: { $gt: 0 } }],
+      [driver.token, 'POST', '/api/carpool/trips', { departure: ne, departureAt: `${campusDay(2)}T08:00`, seats: 2 }],
+      [driver.token, 'PATCH', `/api/carpool/trips/${trip.id}`, { seats: { $inc: 5 } }],
+      [driver.token, 'PATCH', `/api/carpool/trips/${trip.id}`, { preferences: { smoking: { $ne: false } } }],
+      [student.token, 'POST', `/api/carpool/trips/${trip.id}/requests`, { seats: { $gt: 0 }, message: ne }],
+      [driver.token, 'POST', `/api/carpool/trips/${trip.id}/messages`, { body: ne }],
+      [driver.token, 'POST', `/api/carpool/trips/${trip.id}/messages`, { body: 'Hello', clientRequestId: ne }],
+      [driver.token, 'POST', `/api/carpool/trips/${trip.id}/cancel`, { reason: ne }],
+      [driver.token, 'POST', `/api/carpool/trips/${trip.id}/ratings`, { userId: ne, score: 5 }],
+      [student.token, 'POST', `/api/marketplace/documents/${doc}/purchase`, { expectedPrice: { $gt: 0 } }],
+      [student.token, 'PUT', `/api/marketplace/documents/${doc}/review`, { rating: { $gt: 0 }, comment: ne }],
+      [student.token, 'POST', `/api/marketplace/documents/${doc}/report`, { reason: ne }],
+      [driver.token, 'PATCH', `/api/marketplace/documents/${doc}`, { price: { $gt: 0 } }],
+      [admin, 'POST', `/api/marketplace/documents/${doc}/unpublish`, { reason: ne }],
+      [alumni.token, 'PUT', '/api/alumni/me', { visibility: { $ne: 'PRIVATE' }, consent: true }],
+      [alumni.token, 'PUT', '/api/alumni/me', { skills: [ne], program: ne, promotion: { $gt: 0 } }],
+      [alumni.token, 'POST', '/api/alumni/posts', { type: { $in: ['OTHER'] }, body: ne }],
+      [student.token, 'POST', `/api/alumni/${listed.profileId}/mentoring`, { topic: ne, message: { $regex: '.*' } }],
+    ];
+    const failures: string[] = [];
+    for (const [token, method, url, json] of bodies) {
+      expectAnswer(failures, `${method} ${url} ${JSON.stringify(json)}`, await call(method, url, { token, json }), 400, 'VALIDATION_ERROR');
+    }
+    const ids: [string, string, string, unknown?][] = [
+      [student.token, 'GET', `/api/carpool/trips/${OPERATOR_ID}`],
+      [student.token, 'POST', `/api/carpool/trips/${OPERATOR_ID}/requests`, { seats: 1 }],
+      [student.token, 'POST', `/api/carpool/requests/${OPERATOR_ID}/cancel`],
+      [student.token, 'GET', `/api/carpool/trips/${OPERATOR_ID}/messages`],
+      [student.token, 'GET', `/api/marketplace/documents/${OPERATOR_ID}`],
+      [student.token, 'GET', `/api/marketplace/documents/${OPERATOR_ID}/file`],
+      [student.token, 'POST', `/api/marketplace/documents/${OPERATOR_ID}/purchase`, {}],
+      [admin, 'POST', `/api/marketplace/reports/${OPERATOR_ID}/resolve`, {}],
+      [admin, 'DELETE', `/api/marketplace/reviews/${OPERATOR_ID}`],
+      [student.token, 'GET', `/api/alumni/${OPERATOR_ID}`],
+      [student.token, 'GET', `/api/alumni/mentoring/${OPERATOR_ID}`],
+      [student.token, 'POST', `/api/alumni/${OPERATOR_ID}/mentoring`, { topic: 'Careers', message: MENTORING_MESSAGE }],
+      [admin, 'POST', `/api/alumni/posts/${OPERATOR_ID}/hide`, {}],
+    ];
+    for (const [token, method, url, json] of ids) expectAnswer(failures, `${method} ${url}`, await call(method, url, { token, json }), 400, 'INVALID_ID');
+    const queries: [string, string][] = [
+      [student.token, '/api/carpool/trips?lat[$gt]=0&lng=10.1'],
+      [student.token, '/api/carpool/trips?lat=36.8&lng=10.1&radiusKm=1000'],
+      [student.token, '/api/carpool/trips?direction=.*'],
+      [student.token, '/api/carpool/trips?seats=1%7C%7C1'],
+      [driver.token, `/api/carpool/trips/${trip.id}/messages?before=.*`],
+      [student.token, '/api/carpool/me/trips?role=.*'],
+      [student.token, '/api/marketplace/documents?sort=%24natural'],
+      [student.token, '/api/marketplace/documents?subject=.*'],
+      [student.token, '/api/marketplace/documents?type=.*'],
+      [student.token, '/api/marketplace/documents?free=.*'],
+      [student.token, '/api/alumni?program=.*'],
+      [student.token, '/api/alumni?sort=%24natural'],
+      [student.token, '/api/alumni?mentoring=.*'],
+      [student.token, '/api/alumni/posts?type=.*'],
+      [student.token, '/api/alumni/mentoring?status=.*'],
+    ];
+    for (const [token, url] of queries) expectAnswer(failures, `GET ${url}`, await call('GET', url, { token }), 400, 'VALIDATION_ERROR');
+    // Regex-looking filters are matched literally, never as patterns.
+    for (const url of ['/api/alumni?q=.*', `/api/alumni?q=${encodeURIComponent('^')}`, '/api/alumni?skill=.*', '/api/alumni?sector=.*', '/api/marketplace/documents?professor=.*']) {
+      const res = await call('GET', url, { token: student.token });
+      if (res.status !== 200 || res.body?.total !== 0) failures.push(`GET ${url}: ${res.status}, total ${res.body?.total} (the pattern was interpreted)`);
+    }
+    if (!((await call('GET', '/api/alumni?q=Software', { token: student.token })).body?.total > 0)) failures.push('positive control: q=Software finds nothing');
+    expect(failures).toEqual([]);
+    // Nothing was changed by the refused calls.
+    expect((await call('GET', `/api/carpool/trips/${trip.id}`, { token: driver.token })).body).toMatchObject({ seats: 3, status: 'OPEN', preferences: { smoking: false } });
+    expect((await call('GET', `/api/marketplace/documents/${doc}`, { token: student.token })).body).toMatchObject({ price: 5, status: 'PUBLISHED' });
+  });
+
+  test('phase 3 per-user limits: tickets, trips, seat requests, chat messages, uploads, reports, posts and mentoring requests (429, security backend)', async () => {
+    const base = SECURITY_API_URL;
+    const adminEmail = uniqueEmail('sec-p3-admin');
+    const adminPassword = secret('password', `Sec-${rand()}-Admin-Passw0rd!`);
+    createAdmin(adminEmail, adminPassword, 'Ada', 'Admin', SECURITY_MONGO_URI);
+    const admin = await login(adminEmail, adminPassword, base);
+    const person = async (role: string) => {
+      const email = uniqueEmail(`sec-p3-${role.toLowerCase()}`);
+      const password = secret('password', `Sec-${rand()}-Passw0rd!`);
+      const res = await call('POST', '/api/users', { base, token: admin.token, json: { firstname: 'Rate', lastname: role, email, password, role } });
+      expect(res.status, `create ${role}: ${res.text}`).toBe(201);
+      return login(email, password, base);
+    };
+    const student = await person('STUDENT');
+    const other = await person('STUDENT');
+    const alumni = await person('ALUMNI');
+    const randomId = () => crypto.randomBytes(12).toString('hex');
+    // The limiters run before the controllers: refused bodies (400) and unknown ids (404) count too.
+    const limits: [string, string, (token: string) => Promise<Res>][] = [
+      ['realtime ticket', student.token, (token) => call('GET', '/api/realtime/ticket', { base, token })],
+      ['trip offer', student.token, (token) => call('POST', '/api/carpool/trips', { base, token, json: {} })],
+      ['seat request', student.token, (token) => call('POST', `/api/carpool/trips/${randomId()}/requests`, { base, token, json: { seats: 1 } })],
+      ['chat message', student.token, (token) => call('POST', `/api/carpool/trips/${randomId()}/messages`, { base, token, json: { body: 'Hello' } })],
+      ['document upload', student.token, (token) => call('POST', '/api/marketplace/documents', { base, token, json: {} })],
+      ['document report', student.token, (token) => call('POST', `/api/marketplace/documents/${randomId()}/report`, { base, token, json: { reason: 'Copied notes' } })],
+      ['alumni post', alumni.token, (token) => call('POST', '/api/alumni/posts', { base, token, json: {} })],
+      ['mentoring request', student.token, (token) => call('POST', `/api/alumni/${randomId()}/mentoring`, { base, token, json: { topic: 'Careers', message: MENTORING_MESSAGE } })],
+    ];
+    const failures: string[] = [];
+    for (const [label, token, send] of limits) {
+      const seen: number[] = [];
+      for (let i = 0; i < RATE_LIMIT_PHASE3_MAX; i += 1) seen.push((await send(token)).status);
+      if (seen.includes(429)) failures.push(`${label}: limited before ${RATE_LIMIT_PHASE3_MAX} requests (${seen.join(', ')})`);
+      const limited = await send(token);
+      if (limited.status !== 429 || limited.body?.code !== 'TOO_MANY_REQUESTS' || !(Number(limited.headers['retry-after']) > 0)) {
+        failures.push(`${label}: ${limited.status} ${limited.body?.code ?? ''}, Retry-After ${limited.headers['retry-after']}`);
+      }
+    }
+    // One counter per user: another student is not blocked.
+    for (const [label, , send] of limits.filter(([label]) => label !== 'alumni post')) {
+      if ((await send(other.token)).status === 429) failures.push(`${label}: another student is blocked`);
+    }
+    expect(failures).toEqual([]);
+  });
+
+  // ---------- web app
+
+  test('phase 3 through the web app: tickets, premium files and cross-site writes are bound to the session; pages never show exact addresses to outsiders nor user text as HTML', async () => {
+    test.setTimeout(300_000);
+    const admin = w.admin.token;
+    const [driver, passenger, outsider, buyer] = await Promise.all([createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT'), createUser(admin, 'STUDENT')]);
+    const alumni = await listedAlumni();
+    const failures: string[] = [];
+    const web = (url: string, person?: Person, headers: Record<string, string> = {}) =>
+      call('GET', `${WEB_URL}${url}`, { headers: { ...(person ? { Cookie: cookieOf(person) } : {}), ...headers } });
+
+    // Real-time tickets through the BFF: the signed-in user's own, never cached; none without a session.
+    const ticket = await web('/bff/realtime/ticket', outsider);
+    expect(ticket.status, ticket.text.slice(0, 200)).toBe(200);
+    secret('realtime ticket', ticket.body.ticket, REALTIME_TICKET_PATHS);
+    expect(decodeJwt(ticket.body.ticket).sub).toBe(outsider.id);
+    expect(ticket.headers['cache-control']).toMatch(/no-store/);
+    expectAnswer(failures, 'ticket without a session', await web('/bff/realtime/ticket'), 401, 'AUTH_REQUIRED');
+    expect((await openSocket({ ticket: ticket.body.ticket }, { Origin: WEB_ORIGIN })).refused).toBeNull();
+
+    // Premium files through the BFF: the buyer's session only, as an attachment.
+    const marker = `web${rand()}`;
+    const premium = await marketDocument(driver, 10, `${marker} premium`);
+    const unbought = await marketDocument(driver, 10, `${marker} other`);
+    expect((await call('POST', `/api/marketplace/documents/${premium}/purchase`, { token: buyer.token, json: {} })).status).toBe(201);
+    const own = await web(`/bff/marketplace/documents/${premium}/file`, buyer, { Accept: '*/*' });
+    expect(own.status).toBe(200);
+    expect(own.text).toContain(`${marker} premium`);
+    expect(own.headers['content-disposition']).toMatch(/^attachment;/);
+    expect(own.headers['x-content-type-options']).toBe('nosniff');
+    expectAnswer(failures, 'premium file through the BFF, not bought', await web(`/bff/marketplace/documents/${premium}/file`, outsider, { Accept: '*/*' }), 404, 'RESOURCE_NOT_FOUND');
+
+    // Cross-site writes are refused by the BFF (Origin check): no erasure, no purchase, no chat message.
+    const payload = `<img src=x onerror=alert('${marker}')><script>alert('${marker}')</script>`;
+    const trip = await offerTrip(driver, { notes: `${payload}\nBring a coat` });
+    await acceptSeat(driver, await requestSeat(passenger, trip.id));
+    const csrf: [Person, string, string, unknown][] = [
+      [alumni, 'DELETE', '/bff/alumni/me', undefined],
+      [buyer, 'POST', `/bff/marketplace/documents/${unbought}/purchase`, {}],
+      [passenger, 'POST', `/bff/carpool/trips/${trip.id}/messages`, { body: 'Cross-site message' }],
+    ];
+    for (const [person, method, url, json] of csrf) {
+      for (const origin of [undefined, 'http://evil.example', 'null']) {
+        const headers: Record<string, string> = { Cookie: cookieOf(person), ...(origin ? { Origin: origin } : {}) };
+        expectAnswer(failures, `${method} ${url} Origin=${origin}`, await call(method, `${WEB_URL}${url}`, { headers, json }), 403, 'FORBIDDEN');
+      }
+    }
+    expect((await call('GET', `/api/alumni/${alumni.profileId}`, { token: outsider.token })).status).toBe(200);
+    expect((await walletOf(buyer)).balance).toBe(90);
+    expect((await call('GET', `/api/carpool/trips/${trip.id}/messages`, { token: driver.token })).body.items).toEqual([]);
+
+    // Pages: user text is escaped; the exact address is only in the participants' page.
+    const raw = [`<img src=x onerror=alert('${marker}')`, `<script>alert('${marker}')`];
+    const page = async (label: string, url: string, person: Person) => {
+      const res = await web(url, person, { Accept: 'text/html' });
+      if (res.status !== 200 || !res.text.includes(marker)) failures.push(`${label}: ${res.status}, marker shown: ${res.text.includes(marker)}`);
+      for (const item of raw) if (res.text.includes(item)) failures.push(`${label} contains the raw HTML ${item}`);
+      return res;
+    };
+    const outsiderPage = await page('trip page of another student', `/dashboard/carpool/${trip.id}`, outsider);
+    if (EXACT_DIGITS.test(outsiderPage.text)) failures.push("the exact address is in another student's trip page");
+    const passengerPage = await page('trip page of the passenger', `/dashboard/carpool/${trip.id}`, passenger);
+    if (!EXACT_DIGITS.test(passengerPage.text)) failures.push('positive control: the exact address is not in the passenger page');
+    const described = await uploadDocument(driver, { title: `Escaped ${marker}`, description: `${payload}\nLine two`, price: 0 }, [file('escaped.pdf', 'application/pdf', pdf(marker))]);
+    expect(described.status, described.text).toBe(201);
+    expect((await call('POST', `/api/marketplace/documents/${described.body.id}/approve`, { token: admin })).status).toBe(200);
+    await page('marketplace document page', `/dashboard/marketplace/${described.body.id}`, outsider);
+    expect((await call('POST', '/api/alumni/posts', { token: alumni.token, json: { type: 'OTHER', body: `${payload}\nSecond line` } })).status).toBe(201);
+    await page('alumni news wall', '/dashboard/alumni?tab=news', outsider);
+    expect(failures).toEqual([]);
+  });
+});
+
 // ---------------------------------------------------------------- web app (Next.js on 3100)
 
 test.describe('web app', () => {
@@ -1929,7 +3353,10 @@ test.describe('web app', () => {
       // Phase 2: admin and staff pages (other students' data) are never saved either.
       '/dashboard/admin/bookings', '/dashboard/admin/bookings?tab=stats', '/dashboard/admin/forum', '/dashboard/admin/analytics',
       `/dashboard/admin/analytics/students/${w.studentA.id}`, '/dashboard/attendance', `/dashboard/attendance/${w.sessionA}`,
-      '/dashboard/grades', `/dashboard/grades/${w.sessionA}`, `/dashboard/forum/profile/${w.studentA.id}`, '/bff/analytics/me/report.pdf'];
+      '/dashboard/grades', `/dashboard/grades/${w.sessionA}`, `/dashboard/forum/profile/${w.studentA.id}`, '/bff/analytics/me/report.pdf',
+      // Phase 3: the moderation queue (other users' documents and reports), tickets and files.
+      '/dashboard/admin/marketplace', `/dashboard/admin/marketplace?document=${w.sessionA}`, '/bff/realtime/ticket',
+      `/bff/marketplace/documents/${w.sessionA}/file`, '/bff/alumni/me/export'];
     for (const route of never) if (kind(route) !== null) failures.push(`${route} would be saved (${kind(route)})`);
     for (const route of ['/dashboard', '/dashboard/timetable', '/dashboard/announcements', `/dashboard/announcements/${w.sessionA}`, '/dashboard/notifications',
       '/dashboard/bookings', '/dashboard/forum', `/dashboard/forum/${w.sessionA}`, '/dashboard/analytics']) {
@@ -2061,6 +3488,41 @@ test('phase 2 answers never carry an email address, a raw id, a snapshot or an i
     walk(JSON.parse(entry.text), '$', entry);
     if (/[a-z0-9._+-]+@campuslink\.test/i.test(entry.text)) leaks.add(`${entry.label}: an email address`);
   }
+  expect(answers.length).toBeGreaterThan(100);
+  expect([...leaks]).toEqual([]);
+});
+
+test("phase 3 answers never carry an e-mail address (outside an accepted mentoring contact or the caller's own export), a raw id, a snapshot or an internal field", async () => {
+  const entries = fs.readFileSync(RECORD_FILE, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as Answer | Secret);
+  const answers = entries.filter(
+    (entry): entry is Answer => entry.kind === 'answer' && /^\/(api|bff)\/(carpool|marketplace|alumni|realtime)(\/|$)/.test(entry.path)
+  );
+  // People are { id, firstname, lastname, ... }; places { label, lat, lng }; files { filename, size, mimeType }.
+  const internal = new Set(['_id', '__v', 'password', 'email', 'driverSnapshot', 'passengerSnapshot', 'senderSnapshot', 'authorSnapshot',
+    'mentorSnapshot', 'menteeSnapshot', 'searchPoint', 'location', 'coordinates', 'source', 'ratingSum', 'sales', 'purchasesInFlight',
+    'deleting', 'buyerBalanceAfter', 'seller', 'pending', 'pendingSlot', 'sectorKey', 'skillKeys', 'hiddenBy', 'mentorErasedAt',
+    'menteeErasedAt', 'active', 'key', 'calendarToken', 'tokenHash', 'jti']);
+  // The only places with e-mail addresses: `contact` of a mentoring request (participants, ACCEPTED) and `user.email` of
+  // the caller's own export.
+  const mentoringPaths = /^\/(api|bff)\/alumni\/(mentoring(\/|$)|me\/export$|[a-f0-9]{24}\/mentoring$)/;
+  const leaks = new Set<string>();
+  const walk = (value: unknown, where: string, entry: Answer) => {
+    if (Array.isArray(value)) value.forEach((item, i) => walk(item, `${where}[${i}]`, entry));
+    else if (value && typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) {
+        if (where === '$' && entry.isError && key === 'details') continue; // keyed by field name
+        if (key === 'contact' && item !== null) {
+          if (!mentoringPaths.test(entry.path)) leaks.add(`${entry.label}: contact at ${where}`);
+          continue;
+        }
+        if (key === 'email' && where === '$.user' && /\/alumni\/me\/export$/.test(entry.path)) continue;
+        if (internal.has(key)) leaks.add(`${entry.label}: key ${where}.${key}`);
+        if (typeof item === 'string' && /[a-z0-9._+-]+@campuslink\.test/i.test(item)) leaks.add(`${entry.label}: an e-mail address at ${where}.${key}`);
+        walk(item, `${where}.${key}`, entry);
+      }
+    }
+  };
+  for (const entry of answers) walk(JSON.parse(entry.text), '$', entry);
   expect(answers.length).toBeGreaterThan(100);
   expect([...leaks]).toEqual([]);
 });

@@ -112,10 +112,12 @@ test.describe('GET /api/users/stats', () => {
     await createUser(api, { role: 'TEACHER' });
     await createUser(api, { role: 'ALUMNI' });
 
+    // Other spec files create accounts in parallel (same database): the counts can only grow by at least ours.
     const after = await api.get('/api/users/stats', { token: adminToken });
-    expect(after.body.TEACHER).toBe(before.body.TEACHER + 1);
-    expect(after.body.ALUMNI).toBe(before.body.ALUMNI + 1);
+    expect(after.body.TEACHER).toBeGreaterThanOrEqual(before.body.TEACHER + 1);
+    expect(after.body.ALUMNI).toBeGreaterThanOrEqual(before.body.ALUMNI + 1);
     expect(after.body.STUDENT).toBeGreaterThanOrEqual(before.body.STUDENT);
+    expect(after.body.ADMIN).toBeGreaterThanOrEqual(before.body.ADMIN);
   });
 });
 

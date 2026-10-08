@@ -22,6 +22,11 @@ export const RATE_LIMIT_IP_MAX = 30;
 export const RATE_LIMIT_RESET_MAX = 5;
 /** Booking creations and cancellations per user and per hour on the security backend (production default: 30). */
 export const RATE_LIMIT_BOOKING_MAX = 5;
+/**
+ * Phase 3 per-user limits on the security backend (realtime tickets, carpool trips / requests / messages, marketplace
+ * uploads / reports, alumni posts / mentoring requests). Production defaults: 60, 20, 30, 30, 10, 20, 10, 10.
+ */
+export const RATE_LIMIT_PHASE3_MAX = 3;
 
 export const JWT_SECRET = 'test-secret';
 /** Lower than the production default (5) so the lockout test stays short. */
