@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Notification = require('../models/notificationModel');
 const User = require('../models/userModel');
 const pushService = require('./pushService');
+const realtime = require('./realtime');
 const { normalizeLocale, DEFAULT_LOCALE } = require('../utils/validation');
 
 const { NOTIFICATION_TYPES, TITLE_MAX_LENGTH, BODY_MAX_LENGTH } = Notification;
@@ -103,6 +104,9 @@ const notifyUsers = async (userIds, buildMessage, { push = true } = {}) => {
         }))
       );
       report.notified += docs.length;
+      // Real-time hint for the open clients (phase 3 contract section 1): best effort, emitToUser never throws.
+      const hint = (doc) => ({ id: String(doc._id), type: doc.type, title: doc.title });
+      docs.forEach((doc) => realtime.emitToUser(doc.user, 'notification:new', hint(doc)));
 
       if (push) {
         const pushes = docs.map((doc, index) => {
