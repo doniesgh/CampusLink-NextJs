@@ -7,7 +7,7 @@ import { requireRole } from "@/lib/dal";
 import { getErrorFormatter } from "@/lib/i18n/server";
 import { serverApi } from "@/lib/server-api";
 import type { Group, Program, Room, Subject } from "@/lib/types";
-import { AcademicManager } from "./academic-manager";
+import { AcademicManager, type RoomBookingLabels } from "./academic-manager";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("admin.academic");
@@ -18,6 +18,19 @@ export async function generateMetadata(): Promise<Metadata> {
 function currentAcademicYear(now = new Date()): string {
   const year = now.getUTCFullYear();
   return now.getUTCMonth() >= 8 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
+/** Labels of the two room booking fields (Module 5, "bookings" messages: the client only has "admin" here). */
+async function roomBookingLabels(): Promise<RoomBookingLabels> {
+  const t = await getTranslations("bookings.roomForm");
+  return {
+    bookable: t("bookable"),
+    bookableHint: t("bookableHint"),
+    requiresApproval: t("requiresApproval"),
+    requiresApprovalHint: t("requiresApprovalHint"),
+    notBookable: t("notBookable"),
+    approval: t("approval"),
+  };
 }
 
 export default async function AdminAcademicPage() {
@@ -51,7 +64,7 @@ export default async function AdminAcademicPage() {
     <div className="container space-y-6 py-6 sm:py-10">
       <PageHeader title={t("title")} description={t("subtitle")} />
       {data ? (
-        <AcademicManager {...data} defaultAcademicYear={currentAcademicYear()} />
+        <AcademicManager {...data} defaultAcademicYear={currentAcademicYear()} bookingLabels={await roomBookingLabels()} />
       ) : (
         <InlineFeedback feedback={{ type: "error", message: loadError ?? "" }} />
       )}

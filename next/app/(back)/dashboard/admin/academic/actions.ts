@@ -77,6 +77,12 @@ function readBody(resource: AcademicResource, formData: FormData): { body: Recor
     }
     if (!ROOM_TYPES.includes(type as RoomType)) errors.type = "invalidValue";
     body.type = type;
+    // Booking fields (Module 5): sent as booleans when the dialog has the checkboxes.
+    if (formData.get("bookingFields") === "1") {
+      body.bookable = formData.get("bookable") === "on";
+      body.requiresApproval = formData.get("requiresApproval") === "on";
+      Object.assign(values, { bookable: body.bookable ? "on" : "off", requiresApproval: body.requiresApproval ? "on" : "off" });
+    }
   }
   return { body, errors, values };
 }

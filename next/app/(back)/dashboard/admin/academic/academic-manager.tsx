@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/auth/submit-button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CheckboxField } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InlineFeedback, useFeedback, type Feedback } from "@/components/ui/feedback";
@@ -18,9 +19,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionState } from "@/lib/server-api";
 import { ROOM_TYPES, type Group, type Program, type Room, type Subject } from "@/lib/types";
+import type { BookableRoom } from "@/lib/bookings/types";
 import { deleteAcademicAction, saveAcademicAction, type AcademicResource } from "./actions";
 
 type Item = Program | Group | Subject | Room;
+
+/** Labels of the room booking fields (Module 5), translated by the page ("bookings" messages). */
+export type RoomBookingLabels = {
+  bookable: string;
+  bookableHint: string;
+  requiresApproval: string;
+  requiresApprovalHint: string;
+  notBookable: string;
+  approval: string;
+};
+
 type DialogState = { open: boolean; resource: AcademicResource; editing: Item | null; key: number };
 
 const initialState: ActionState = {};
@@ -32,12 +45,14 @@ function ResourceDialog({
   programs,
   defaultAcademicYear,
   onSaved,
+  bookingLabels,
 }: {
   state: DialogState;
   onOpenChange: (open: boolean) => void;
   programs: Program[];
   defaultAcademicYear: string;
   onSaved: (feedback: Feedback) => void;
+  bookingLabels?: RoomBookingLabels;
 }) {
   const t = useTranslations("admin.academic");
   const { resource, editing } = dialog;
@@ -54,6 +69,14 @@ function ResourceDialog({
   const values = state.ok ? {} : (state.values ?? {});
   const current = (editing ?? {}) as Partial<Program & Group & Subject & Room>;
   const value = (name: string, fallback: string | number | undefined) => values[name] ?? (fallback === undefined ? "" : String(fallback));
+  // Rooms: "Requires approval" follows the type (amphitheaters) until it is changed by hand. Both fields stay
+  // uncontrolled (React resets the form after the action; the defaults then hold the submitted values).
+  const room = (resource === "rooms" ? editing : null) as BookableRoom | null;
+  const [roomType, setRoomType] = useState(() => value("type", current.type ?? "CLASSROOM"));
+  const [manualApproval, setManualApproval] = useState<boolean | null>(() =>
+    room ? (room.requiresApproval ?? room.type === "AMPHITHEATER") : null
+  );
+  const approvalDefault = values.requiresApproval ? values.requiresApproval === "on" : (manualApproval ?? roomType === "AMPHITHEATER");
 
   return (
     <Dialog open={dialog.open} onOpenChange={onOpenChange}>
@@ -142,7 +165,15 @@ function ResourceDialog({
                 </Field>
                 <Field id="academic-type" label={t("fields.type")} error={errors.type}>
                   {(props) => (
-                    <Select {...props} name="type" defaultValue={value("type", current.type ?? "CLASSROOM")}>
+                    <Select
+                      {...props}
+                      // React does not update a select's default after mounting: remount it after a failed save so the
+                      // form reset keeps the submitted type.
+                      key={`type-${state.at ?? 0}`}
+                      name="type"
+                      defaultValue={value("type", current.type ?? "CLASSROOM")}
+                      onChange={(event) => setRoomType(event.target.value)}
+                    >
                       {ROOM_TYPES.map((type) => (
                         <option key={type} value={type}>
                           {t(`roomTypes.${type}`)}
@@ -152,6 +183,27 @@ function ResourceDialog({
                   )}
                 </Field>
               </div>
+              {bookingLabels && (
+                <div className="space-y-3">
+                  <input type="hidden" name="bookingFields" value="1" />
+                  <CheckboxField
+                    id="academic-bookable"
+                    name="bookable"
+                    label={bookingLabels.bookable}
+                    description={bookingLabels.bookableHint}
+                    defaultChecked={values.bookable ? values.bookable === "on" : room?.bookable !== false}
+                  />
+                  <CheckboxField
+                    key={values.requiresApproval || manualApproval !== null ? "manual" : `auto-${roomType}`}
+                    id="academic-requires-approval"
+                    name="requiresApproval"
+                    label={bookingLabels.requiresApproval}
+                    description={bookingLabels.requiresApprovalHint}
+                    defaultChecked={approvalDefault}
+                    onChange={(event) => setManualApproval(event.target.checked)}
+                  />
+                </div>
+              )}
             </>
           )}
 
@@ -173,12 +225,14 @@ export function AcademicManager({
   subjects,
   rooms,
   defaultAcademicYear,
+  bookingLabels,
 }: {
   programs: Program[];
   groups: Group[];
   subjects: Subject[];
   rooms: Room[];
   defaultAcademicYear: string;
+  bookingLabels?: RoomBookingLabels;
 }) {
   const t = useTranslations("admin.academic");
   const [tab, setTab] = useState<AcademicResource>("programs");
@@ -351,7 +405,15 @@ export function AcademicManager({
                   <TableCell className="font-medium">{room.name}</TableCell>
                   <TableCell>{room.building || "—"}</TableCell>
                   <TableCell>{room.capacity ?? "—"}</TableCell>
-                  <TableCell>{t(`roomTypes.${room.type}`)}</TableCell>
+                  <TableCell>
+                    {t(`roomTypes.${room.type}`)}
+                    {bookingLabels && ((room as BookableRoom).bookable === false || ((room as BookableRoom).requiresApproval ?? room.type === "AMPHITHEATER")) && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {(room as BookableRoom).bookable === false && <Badge variant="neutral">{bookingLabels.notBookable}</Badge>}
+                        {((room as BookableRoom).requiresApproval ?? room.type === "AMPHITHEATER") && <Badge variant="warning">{bookingLabels.approval}</Badge>}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{actions("rooms", room)}</TableCell>
                 </TableRow>
               ))}
@@ -367,6 +429,7 @@ export function AcademicManager({
         programs={programs}
         defaultAcademicYear={defaultAcademicYear}
         onSaved={setFeedback}
+        bookingLabels={bookingLabels}
       />
     </div>
   );
