@@ -1,0 +1,15 @@
+{
+  "metaTitle": "My progress",
+  "title": "My progress",
+  "description": "Your attendance, grades and progress.",
+  "attendanceMetaTitle": "Attendance",
+  "attendanceTitle": "Attendance",
+  "attendanceDescription": "Take attendance for your sessions.",
+  "gradesMetaTitle": "Grades",
+  "gradesTitle": "Grades",
+  "gradesDescription": "Assessments, grade entry and publication.",
+  "followUpMetaTitle": "Student follow-up",
+  "followUpTitle": "Student follow-up",
+  "followUpDescription": "Absence alerts and group overview.",
+  "comingSoon": "Coming soon."
+}

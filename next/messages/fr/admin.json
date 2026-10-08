@@ -171,6 +171,24 @@
         "schedule": "Annonce programmée",
         "update": "Annonce modifiée",
         "delete": "Annonce supprimée"
+      },
+      "equipment": {
+        "create": "Matériel ajouté",
+        "update": "Matériel modifié",
+        "delete": "Matériel supprimé"
+      },
+      "booking": {
+        "approve": "Réservation acceptée",
+        "reject": "Réservation refusée",
+        "cancel": "Réservation annulée"
+      },
+      "forum": {
+        "hide": "Contenu du forum masqué",
+        "unhide": "Contenu du forum réaffiché",
+        "delete": "Contenu du forum supprimé"
+      },
+      "attendance": {
+        "update": "Présences modifiées"
       }
     },
     "system": "Système",

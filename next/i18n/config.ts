@@ -22,6 +22,9 @@ export const NAMESPACES = [
   "offline",
   "timetable",
   "announcements",
+  "bookings",
+  "forum",
+  "analytics",
 ] as const;
 export type Namespace = (typeof NAMESPACES)[number];
 

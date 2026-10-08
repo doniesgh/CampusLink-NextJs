@@ -7,26 +7,24 @@ export type NavLabelKey =
   | "announcements"
   | "notifications"
   | "account"
+  | "bookings"
+  | "forum"
+  | "analytics"
+  | "attendance"
+  | "grades"
   | "users"
   | "academic"
   | "timetableManagement"
   | "announcementsManagement"
+  | "bookingsManagement"
+  | "forumModeration"
+  | "studentFollowUp"
   | "audit";
 
-export type NavIconName =
-  | "home"
-  | "timetable"
-  | "announcements"
-  | "notifications"
-  | "account"
-  | "users"
-  | "academic"
-  | "timetableManagement"
-  | "announcementsManagement"
-  | "audit";
+export type NavIconName = NavLabelKey;
 
 export type NavItem = { key: NavLabelKey; href: string; icon: NavIconName };
-export type NavGroup = { labelKey: "administration" | "teaching"; items: NavItem[] };
+export type NavGroup = { labelKey: "campus" | "administration" | "teaching"; items: NavItem[] };
 
 /** Links every signed-in user sees (also the mobile bottom navigation). */
 export const MAIN_NAV: NavItem[] = [
@@ -37,21 +35,61 @@ export const MAIN_NAV: NavItem[] = [
   { key: "account", href: "/dashboard/account", icon: "account" },
 ];
 
+const item = (key: NavLabelKey, href: string): NavItem => ({ key, href, icon: key });
+
+// Phase 2 modules (docs/phase2-contract.md section 4).
+const BOOKINGS = item("bookings", "/dashboard/bookings");
+const FORUM = item("forum", "/dashboard/forum");
+const ANALYTICS = item("analytics", "/dashboard/analytics");
+const ATTENDANCE = item("attendance", "/dashboard/attendance");
+const GRADES = item("grades", "/dashboard/grades");
+
 const ADMIN_NAV: NavItem[] = [
-  { key: "users", href: "/dashboard/admin/users", icon: "users" },
-  { key: "academic", href: "/dashboard/admin/academic", icon: "academic" },
-  { key: "timetableManagement", href: "/dashboard/admin/timetable", icon: "timetableManagement" },
-  { key: "announcementsManagement", href: "/dashboard/admin/announcements", icon: "announcementsManagement" },
-  { key: "audit", href: "/dashboard/admin/audit", icon: "audit" },
+  item("users", "/dashboard/admin/users"),
+  item("academic", "/dashboard/admin/academic"),
+  item("timetableManagement", "/dashboard/admin/timetable"),
+  item("announcementsManagement", "/dashboard/admin/announcements"),
+  item("bookingsManagement", "/dashboard/admin/bookings"),
+  item("forumModeration", "/dashboard/admin/forum"),
+  item("studentFollowUp", "/dashboard/admin/analytics"),
+  ATTENDANCE,
+  GRADES,
+  item("audit", "/dashboard/admin/audit"),
 ];
 
-/** Role-based management links: ADMIN gets "Administration", TEACHER gets "Announcements management". */
+/** Campus-life links per role (bookings, forum, personal progress). */
+function campusItems(role: Role | undefined): NavItem[] {
+  switch (role) {
+    case "STUDENT":
+      return [BOOKINGS, FORUM, ANALYTICS];
+    case "TEACHER":
+    case "ADMIN":
+      return [BOOKINGS, FORUM];
+    case "ALUMNI":
+      return [FORUM];
+    default:
+      return [];
+  }
+}
+
+/** Role-based management links: ADMIN gets "Administration", TEACHER gets "Teaching". */
 export function managementNav(role: Role | undefined): NavGroup | null {
   if (role === "ADMIN") return { labelKey: "administration", items: ADMIN_NAV };
   if (role === "TEACHER") {
-    return { labelKey: "teaching", items: ADMIN_NAV.filter((item) => item.key === "announcementsManagement") };
+    const announcements = ADMIN_NAV.find((entry) => entry.key === "announcementsManagement");
+    return { labelKey: "teaching", items: [...(announcements ? [announcements] : []), ATTENDANCE, GRADES] };
   }
   return null;
+}
+
+/** Sidebar groups shown under the main links, in order. */
+export function navGroups(role: Role | undefined): NavGroup[] {
+  const groups: NavGroup[] = [];
+  const campus = campusItems(role);
+  if (campus.length > 0) groups.push({ labelKey: "campus", items: campus });
+  const management = managementNav(role);
+  if (management) groups.push(management);
+  return groups;
 }
 
 /** "/dashboard" is only active on itself; other links also on their sub-pages. */

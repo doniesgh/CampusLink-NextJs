@@ -50,7 +50,16 @@
     "audit": "Journal d'audit",
     "menu": "Menu",
     "menuDescription": "Navigation, langue et session",
-    "skipToContent": "Aller au contenu"
+    "skipToContent": "Aller au contenu",
+    "campus": "Vie de campus",
+    "bookings": "Réservations",
+    "forum": "Forum",
+    "analytics": "Mon suivi",
+    "attendance": "Présences",
+    "grades": "Notes",
+    "bookingsManagement": "Réservations et ressources",
+    "forumModeration": "Modération du forum",
+    "studentFollowUp": "Suivi des étudiants"
   },
   "pagination": {
     "label": "Pagination",

@@ -19,6 +19,12 @@ const pushRoutes = require('./routes/push');
 const auditRoutes = require('./routes/audit');
 const timetableRoutes = require('./routes/timetable');
 const announcementRoutes = require('./routes/announcements');
+const resourceRoutes = require('./routes/resources');
+const bookingRoutes = require('./routes/bookings');
+const forumRoutes = require('./routes/forum');
+const attendanceRoutes = require('./routes/attendance');
+const gradeRoutes = require('./routes/grades');
+const analyticsRoutes = require('./routes/analytics');
 
 const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
 
@@ -53,6 +59,12 @@ app.use('/api/push', pushRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/timetable', timetableRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/resources', resourceRoutes);
+app.use('/api/bookings', bookingRoutes);
+app.use('/api/forum', forumRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/grades', gradeRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', code: 'NOT_FOUND' });

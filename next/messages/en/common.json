@@ -50,7 +50,16 @@
     "audit": "Audit log",
     "menu": "Menu",
     "menuDescription": "Navigation, language and session",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "campus": "Campus life",
+    "bookings": "Bookings",
+    "forum": "Forum",
+    "analytics": "My progress",
+    "attendance": "Attendance",
+    "grades": "Grades",
+    "bookingsManagement": "Bookings & resources",
+    "forumModeration": "Forum moderation",
+    "studentFollowUp": "Student follow-up"
   },
   "pagination": {
     "label": "Pagination",

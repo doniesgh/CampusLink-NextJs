@@ -1,0 +1,15 @@
+{
+  "metaTitle": "Mon suivi",
+  "title": "Mon suivi",
+  "description": "Ton assiduité, tes notes et ta progression.",
+  "attendanceMetaTitle": "Présences",
+  "attendanceTitle": "Présences",
+  "attendanceDescription": "Fais l'appel pour tes séances.",
+  "gradesMetaTitle": "Notes",
+  "gradesTitle": "Notes",
+  "gradesDescription": "Évaluations, saisie et publication des notes.",
+  "followUpMetaTitle": "Suivi des étudiants",
+  "followUpTitle": "Suivi des étudiants",
+  "followUpDescription": "Alertes d'absentéisme et vue par groupe.",
+  "comingSoon": "Bientôt disponible."
+}

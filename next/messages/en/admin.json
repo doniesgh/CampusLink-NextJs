@@ -171,6 +171,24 @@
         "schedule": "Announcement scheduled",
         "update": "Announcement updated",
         "delete": "Announcement deleted"
+      },
+      "equipment": {
+        "create": "Equipment added",
+        "update": "Equipment updated",
+        "delete": "Equipment deleted"
+      },
+      "booking": {
+        "approve": "Booking approved",
+        "reject": "Booking rejected",
+        "cancel": "Booking cancelled"
+      },
+      "forum": {
+        "hide": "Forum content hidden",
+        "unhide": "Forum content shown again",
+        "delete": "Forum content deleted"
+      },
+      "attendance": {
+        "update": "Attendance updated"
       }
     },
     "system": "System",

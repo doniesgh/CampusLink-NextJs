@@ -12,6 +12,10 @@
   "types": {
     "TIMETABLE_CHANGE": "Emploi du temps",
     "ANNOUNCEMENT": "Annonce",
-    "SYSTEM": "CampusLink"
+    "SYSTEM": "CampusLink",
+    "BOOKING": "Réservation",
+    "FORUM": "Forum",
+    "ATTENDANCE": "Présences",
+    "GRADE": "Notes"
   }
 }

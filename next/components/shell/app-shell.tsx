@@ -5,15 +5,23 @@ import Link from "@/components/ui/app-link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
+  Boxes,
+  CalendarCheck,
   CalendarCog,
   CalendarDays,
+  ClipboardCheck,
+  Flag,
+  GraduationCap,
   House,
   Megaphone,
   Menu,
+  MessagesSquare,
   School,
   ScrollText,
   Send,
+  TrendingUp,
   UserRound,
+  UserSearch,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -21,7 +29,7 @@ import { useTranslations } from "next-intl";
 import { useUnreadCount } from "@/components/notifications/use-unread-count";
 import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { LogoutButton } from "@/components/shell/logout-button";
-import { isActive, MAIN_NAV, managementNav, type NavIconName, type NavItem } from "@/components/shell/nav-items";
+import { isActive, MAIN_NAV, navGroups, type NavIconName, type NavItem } from "@/components/shell/nav-items";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/ui/logo";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -38,6 +46,14 @@ const ICONS: Record<NavIconName, LucideIcon> = {
   academic: School,
   timetableManagement: CalendarCog,
   announcementsManagement: Send,
+  bookings: CalendarCheck,
+  forum: MessagesSquare,
+  analytics: TrendingUp,
+  attendance: ClipboardCheck,
+  grades: GraduationCap,
+  bookingsManagement: Boxes,
+  forumModeration: Flag,
+  studentFollowUp: UserSearch,
   audit: ScrollText,
 };
 
@@ -137,7 +153,7 @@ export function AppShell({
   const t = useTranslations("common");
   const pathname = usePathname();
   const unread = useUnreadCount(unreadCount, renderedAt);
-  const management = managementNav(user?.role);
+  const groups = navGroups(user?.role);
   const [menuOpen, setMenuOpen] = React.useState(false);
   // The account page has its own "Language" select: avoid two controls with the same label.
   const showLanguageSwitcher = !isActive(pathname, "/dashboard/account");
@@ -146,20 +162,20 @@ export function AppShell({
   const badgeFor = (item: NavItem) => (item.key === "notifications" ? unread : undefined);
 
   const managementGroup = (onNavigate?: () => void, idSuffix = "desktop") =>
-    management && (
-      <div role="group" aria-labelledby={`nav-management-${idSuffix}`} className="mt-6">
-        <p id={`nav-management-${idSuffix}`} className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {t(`nav.${management.labelKey}`)}
+    groups.map((group) => (
+      <div key={group.labelKey} role="group" aria-labelledby={`nav-${group.labelKey}-${idSuffix}`} className="mt-6">
+        <p id={`nav-${group.labelKey}-${idSuffix}`} className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t(`nav.${group.labelKey}`)}
         </p>
         <ul className="space-y-1">
-          {management.items.map((item) => (
+          {group.items.map((item) => (
             <li key={item.href}>
               <SideLink item={item} label={label(item)} pathname={pathname} onNavigate={onNavigate} />
             </li>
           ))}
         </ul>
       </div>
-    );
+    ));
 
   return (
     <div className="flex flex-1 bg-muted">

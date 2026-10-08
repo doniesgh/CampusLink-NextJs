@@ -11,7 +11,8 @@
  *
  * Saved pages (private data on a possibly shared computer):
  * - only the landing page (public) and the pages of the offline modules: /dashboard, /dashboard/timetable,
- *   /dashboard/announcements(/<id>), /dashboard/notifications. Never the admin pages or /dashboard/account;
+ *   /dashboard/announcements(/<id>), /dashboard/notifications, and (phase 2) /dashboard/bookings,
+ *   /dashboard/forum(/<id>) and /dashboard/analytics. Never the admin pages or /dashboard/account;
  * - each copy carries the account it was rendered for (`x-cl-owner`, set by proxy.ts) and its save time;
  * - a copy is only served to its owner: the `cl_owner` cookie (Cookie Store API; it lives exactly as long as
  *   the session cookies), or where that API is missing the IndexedDB "meta" owner (wiped at the end of a
@@ -67,6 +68,11 @@ const PRIVATE_PAGES = [
   /^\/dashboard\/announcements$/,
   /^\/dashboard\/announcements\/[A-Za-z0-9_-]{1,64}$/,
   /^\/dashboard\/notifications$/,
+  // Phase 2 (docs/phase2-contract.md section 0): same owner and expiry rules.
+  /^\/dashboard\/bookings$/,
+  /^\/dashboard\/forum$/,
+  /^\/dashboard\/forum\/[A-Za-z0-9_-]{1,64}$/,
+  /^\/dashboard\/analytics$/,
 ];
 
 const NEVER_CACHE_PREFIXES = ["/bff/", "/api/", "/auth/"];

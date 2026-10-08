@@ -12,6 +12,10 @@
   "types": {
     "TIMETABLE_CHANGE": "Timetable",
     "ANNOUNCEMENT": "Announcement",
-    "SYSTEM": "CampusLink"
+    "SYSTEM": "CampusLink",
+    "BOOKING": "Booking",
+    "FORUM": "Forum",
+    "ATTENDANCE": "Attendance",
+    "GRADE": "Grades"
   }
 }

@@ -47,6 +47,16 @@ const AUDIT_ACTIONS = [
   "announcement.schedule",
   "announcement.update",
   "announcement.delete",
+  "equipment.create",
+  "equipment.update",
+  "equipment.delete",
+  "booking.approve",
+  "booking.reject",
+  "booking.cancel",
+  "forum.hide",
+  "forum.unhide",
+  "forum.delete",
+  "attendance.update",
 ] as const;
 
 /** Action codes with a readable label (`admin.audit.actionLabels.<code>`); other codes are shown as they are. */
