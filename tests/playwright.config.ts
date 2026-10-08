@@ -12,6 +12,7 @@ import {
   OUTBOX_FILE,
   PUSH_OUTBOX_FILE,
   RATE_LIMIT_AUTH_MAX,
+  RATE_LIMIT_BOOKING_MAX,
   RATE_LIMIT_IP_MAX,
   RATE_LIMIT_RESET_MAX,
   SECURITY_API_PORT,
@@ -70,7 +71,7 @@ const needsWeb = needsE2e || selectedProjects.some((name) => name !== 'api' && n
 // Read by global-setup.ts (same process) to decide whether to warm up the Next.js pages in a browser.
 process.env.CAMPUSLINK_TEST_WEB = needsE2e ? '1' : '0';
 
-/** Phase-1 settings shared by both backends. Values set here take precedence over backend/.env. */
+/** Phase 1 and 2 settings shared by both backends. Values set here take precedence over backend/.env. */
 const phase1BackendEnv = {
   APP_TIMEZONE: 'Africa/Tunis',
   TRUST_PROXY: 'loopback',
@@ -81,6 +82,10 @@ const phase1BackendEnv = {
   SCHEDULER_INTERVAL_MS: '1000',
   NOTIFY_HORIZON_DAYS: '14',
   RATE_LIMIT_WINDOW_MS: '900000',
+  // Phase 2 (docs/phase2-contract.md section 5): contract defaults, whatever backend/.env says.
+  BOOKING_REMINDER_MINUTES: '60',
+  ABSENCE_WARNING_RATE: '0.10',
+  ABSENCE_ALERT_RATE: '0.20',
 };
 
 const nextBin = 'node node_modules/next/dist/bin/next';
@@ -191,6 +196,10 @@ export default defineConfig({
               RATE_LIMIT_AUTH_MAX: String(RATE_LIMIT_AUTH_MAX),
               RATE_LIMIT_IP_MAX: String(RATE_LIMIT_IP_MAX),
               RATE_LIMIT_RESET_MAX: String(RATE_LIMIT_RESET_MAX),
+              // Phase 2: per-user limits of POST /api/bookings and POST /api/bookings/:id/cancel (1 h window).
+              RATE_LIMIT_BOOKING_CREATE_MAX: String(RATE_LIMIT_BOOKING_MAX),
+              RATE_LIMIT_BOOKING_CANCEL_MAX: String(RATE_LIMIT_BOOKING_MAX),
+              RATE_LIMIT_BOOKING_WINDOW_MS: '3600000',
               VAPID_PUBLIC_KEY: TEST_VAPID.publicKey,
               VAPID_PRIVATE_KEY: TEST_VAPID.privateKey,
               VAPID_SUBJECT: 'mailto:security-tests@campuslink.test',

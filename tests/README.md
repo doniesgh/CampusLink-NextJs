@@ -10,8 +10,15 @@ API and web UI contracts.
   NoSQL/regex injection, push endpoint SSRF, secret leaks, auth rate limiting (per email, and per client IP
   only for forwarded addresses, not for loopback without `X-Forwarded-For`), and the web app's BFF,
   `?next=` redirects, security headers, client `X-Forwarded-For` (BFF and a Server Action, in a browser),
-  `Clear-Site-Data` at the end of a session and the service worker's page-saving rules). A failing test there
-  is a vulnerability to fix in `backend/` or `next/`, not in the test.
+  `Clear-Site-Data` at the end of a session and the service worker's page-saving rules). Its `phase 2` block covers
+  bookings, the forum, attendance, grades and analytics: role checks on every new endpoint (401 / 403, another
+  teacher's session or class), IDOR (another user's booking, records, grades, analytics or PDF report, hidden forum
+  content, unpublished grades), mass assignment, concurrent double booking and stale versions (409), per-user rate
+  limits of booking creations and cancellations (security backend), one admin notification per requester every 10
+  minutes, the grades audit trail (a teacher cannot delete a published assessment), NoSQL / regex injection,
+  plain-text forum content in the web page, the group comparison (every figure from at least 5 students) and a final
+  scan of every phase 2 answer (no email, raw id, snapshot or internal field). A failing test there is a
+  vulnerability to fix in `backend/` or `next/`, not in the test.
 - `e2e/`: Chromium tests of the Next.js app. They use accessible labels and roles, and fail on browser
   console errors. `e2e/offline-privacy.spec.ts` needs the service worker, so it only runs with
   `E2E_NEXT_MODE=start` (it is skipped otherwise).
@@ -51,7 +58,7 @@ Development ports (3000, 4000, 27017) are never used.
 | --------------- | ----------------------------------------------- | ----------------------------------------------------------- |
 | MongoDB         | `mongodb://127.0.0.1:27018/campuslink-test`     | `scripts/test-db.mjs`; empty for every run                  |
 | Backend         | `http://localhost:4100`                         | `JWT_SECRET=test-secret`, `OTP_MAX_ATTEMPTS=3`, no SMTP, rate limiting off, push disabled |
-| Security backend| `http://localhost:4101`                         | only when `api/security.spec.ts` runs: own database, `RATE_LIMIT_AUTH_MAX=3`, `RATE_LIMIT_IP_MAX=30`, `RATE_LIMIT_RESET_MAX=5`, test VAPID keys |
+| Security backend| `http://localhost:4101`                         | only when `api/security.spec.ts` runs: own database, `RATE_LIMIT_AUTH_MAX=3`, `RATE_LIMIT_IP_MAX=30`, `RATE_LIMIT_RESET_MAX=5`, `RATE_LIMIT_BOOKING_CREATE_MAX` / `RATE_LIMIT_BOOKING_CANCEL_MAX=5` per hour, test VAPID keys |
 | Next.js         | `http://localhost:3100`                         | `next dev`, with `API_URL=http://localhost:4100` (skipped for api-only runs without the security spec) |
 
 Environment variables passed to the backend take precedence over `backend/.env`, so your own

@@ -20,6 +20,8 @@ export const RATE_LIMIT_AUTH_MAX = 3;
 /** Per-IP limits of the security backend: above the logins the other security tests send from loopback. */
 export const RATE_LIMIT_IP_MAX = 30;
 export const RATE_LIMIT_RESET_MAX = 5;
+/** Booking creations and cancellations per user and per hour on the security backend (production default: 30). */
+export const RATE_LIMIT_BOOKING_MAX = 5;
 
 export const JWT_SECRET = 'test-secret';
 /** Lower than the production default (5) so the lockout test stays short. */

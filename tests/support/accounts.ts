@@ -14,13 +14,14 @@ export const DEFAULT_PASSWORD = 'Passw0rd-Test!';
 /**
  * Creates (or promotes) an ADMIN account in the test database with the backend's own script:
  * `npm run create-admin -- <email> <password> [firstname] [lastname]`.
- * MONGO_URI is passed explicitly, so backend/.env (the developer database) is never used.
+ * MONGO_URI is passed explicitly, so backend/.env (the developer database) is never used. `mongoUri` selects
+ * another test database (the security backend's, SECURITY_MONGO_URI).
  */
-export function createAdmin(email: string, password: string, firstname = 'Ada', lastname = 'Admin'): void {
+export function createAdmin(email: string, password: string, firstname = 'Ada', lastname = 'Admin', mongoUri = MONGO_URI): void {
   try {
     execFileSync(process.execPath, [path.join('scripts', 'create-admin.js'), email, password, firstname, lastname], {
       cwd: BACKEND_DIR,
-      env: { ...process.env, MONGO_URI },
+      env: { ...process.env, MONGO_URI: mongoUri },
       encoding: 'utf8',
       stdio: 'pipe',
       timeout: 60_000,

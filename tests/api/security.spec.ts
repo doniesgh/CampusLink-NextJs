@@ -12,9 +12,11 @@ import {
   MONGO_URI,
   PUSH_OUTBOX_FILE,
   RATE_LIMIT_AUTH_MAX,
+  RATE_LIMIT_BOOKING_MAX,
   RATE_LIMIT_IP_MAX,
   RATE_LIMIT_RESET_MAX,
   SECURITY_API_URL,
+  SECURITY_MONGO_URI,
   STORAGE_DIR,
   TEST_VAPID,
   TMP_DIR,
@@ -826,6 +828,868 @@ test('the per-IP limits apply to a forwarded client address, not to loopback cal
   expect(await statuses(RATE_LIMIT_RESET_MAX + 1, () => badReset())).toEqual(Array(RATE_LIMIT_RESET_MAX + 1).fill(400));
 });
 
+// ---------------------------------------------------------------- phase 2: bookings, forum, attendance, grades, analytics
+
+/** Phase 2 data (one set per worker, on top of `w`), created by the beforeAll of the "phase 2" block. */
+let p: {
+  equipment: string; // active, no approval
+  camera: string; // requires an approval
+  pastA: string; // teacher1 / g1, yesterday: its roll call is open for teacher1
+  studentD: Person; // second student of g1
+  assessment: string; // teacher1, subject / g1, unpublished
+  booking: string; // studentA's PENDING request on the camera
+  question: string; // studentB's question (visible)
+  answer: string; // teacher1's answer to it
+  report: string; // studentC's report of it
+};
+
+/** `{"$ne":null}` as a path segment. */
+const OPERATOR_ID = encodeURIComponent('{"$ne":null}');
+
+/** Records a failure for each private value (another user's id, a marker...) found in the answer. */
+function mentions(failures: string[], label: string, res: Res, values: Record<string, string>) {
+  for (const [name, value] of Object.entries(values)) if (value && res.text.includes(value)) failures.push(`${label} reveals ${name}`);
+}
+
+test.describe('phase 2', () => {
+  test.describe.configure({ timeout: 180_000 });
+
+  test.beforeAll(async ({}, testInfo) => {
+    testInfo.setTimeout(180_000);
+    const admin = w.admin.token;
+    const tag = rand().toUpperCase();
+    const created = (res: Res, what: string) => {
+      expect(res.status, `${what}: ${res.text}`).toBe(201);
+      return res.body.id as string;
+    };
+    const equipment = created(
+      await call('POST', '/api/resources/equipment', { token: admin, json: { name: `SEC-PROJ-${tag}`, category: 'PROJECTOR' } }),
+      'equipment'
+    );
+    const camera = created(
+      await call('POST', '/api/resources/equipment', { token: admin, json: { name: `SEC-CAM-${tag}`, category: 'CAMERA', requiresApproval: true } }),
+      'camera'
+    );
+    const yesterday = campusDay(-1);
+    const past = await call('POST', '/api/timetable/sessions', {
+      token: admin,
+      json: { subject: w.subjectId, teacher: w.teacher1.id, groups: [w.g1], startsAt: `${yesterday}T10:00`, endsAt: `${yesterday}T11:30` },
+    });
+    expect(past.status, `past session: ${past.text}`).toBe(201);
+    const studentD = await createUser(admin, 'STUDENT', w.g1);
+    const assessment = created(
+      await call('POST', '/api/grades/assessments', {
+        token: w.teacher1.token,
+        json: { subject: w.subjectId, group: w.g1, title: `Exam ${tag}`, type: 'EXAM', date: campusDay(0) },
+      }),
+      'assessment'
+    );
+    const booking = created(
+      await call('POST', '/api/bookings', {
+        token: w.studentA.token,
+        json: { resourceType: 'EQUIPMENT', equipment: camera, startsAt: `${campusDay(6)}T09:00`, endsAt: `${campusDay(6)}T10:00`, purpose: 'Security request' },
+      }),
+      'booking'
+    );
+    const question = created(
+      await call('POST', '/api/forum/questions', {
+        token: w.studentB.token,
+        json: { title: `Security question ${tag}`, body: 'A visible question used by the security checks.', subject: w.subjectId },
+      }),
+      'question'
+    );
+    const answer = created(
+      await call('POST', `/api/forum/questions/${question}/answers`, { token: w.teacher1.token, json: { body: 'A certified answer.' } }),
+      'answer'
+    );
+    const report = created(
+      await call('POST', `/api/forum/questions/${question}/report`, { token: w.studentC.token, json: { reason: 'Security check report' } }),
+      'report'
+    );
+    p = { equipment, camera, pastA: past.body.items[0].id, studentD, assessment, booking, question, answer, report };
+  });
+
+  test('new endpoints answer 401 without a token and 403 to the wrong role or another teacher', async () => {
+    const A = w.studentA.id;
+    const { equipment, booking, question, answer, report, assessment, pastA } = p;
+    const sheet = `/api/grades/assessments/${assessment}`;
+    const newAssessment = { subject: w.subjectId, group: w.g1, title: 'Forbidden', type: 'EXAM', date: campusDay(0) };
+    const adminOnly: Endpoint[] = [
+      { method: 'POST', path: '/api/resources/equipment', json: { name: `Forbidden ${rand()}` } },
+      { method: 'PATCH', path: `/api/resources/equipment/${equipment}`, json: { name: 'Hacked' } },
+      { method: 'DELETE', path: `/api/resources/equipment/${equipment}` },
+      { method: 'GET', path: '/api/bookings' },
+      { method: 'GET', path: '/api/bookings/stats' },
+      { method: 'POST', path: `/api/bookings/${booking}/approve`, json: { version: 0 } },
+      { method: 'POST', path: `/api/bookings/${booking}/reject`, json: { version: 0, note: 'No' } },
+      { method: 'GET', path: '/api/forum/reports' },
+      { method: 'POST', path: `/api/forum/reports/${report}/resolve`, json: {} },
+      ...[`questions/${question}`, `answers/${answer}`].flatMap((target) =>
+        ['hide', 'unhide'].map((action): Endpoint => ({ method: 'POST', path: `/api/forum/${target}/${action}`, json: { reason: 'Hacked' } }))
+      ),
+      { method: 'GET', path: '/api/attendance/alerts' },
+      { method: 'GET', path: `/api/analytics/students/${A}` },
+      { method: 'GET', path: `/api/analytics/students/${A}/report.pdf` },
+    ];
+    const staff: Endpoint[] = [
+      { method: 'GET', path: '/api/attendance/sessions' },
+      { method: 'GET', path: `/api/attendance/sessions/${pastA}` },
+      { method: 'PUT', path: `/api/attendance/sessions/${pastA}`, json: { records: [{ student: A, status: 'PRESENT' }] } },
+      { method: 'GET', path: '/api/grades/teaching' },
+      { method: 'GET', path: '/api/grades/assessments' },
+      { method: 'POST', path: '/api/grades/assessments', json: newAssessment },
+      { method: 'GET', path: sheet },
+      { method: 'PATCH', path: sheet, json: { title: 'Hacked' } },
+      { method: 'DELETE', path: sheet },
+      { method: 'GET', path: `${sheet}/grades` },
+      { method: 'PUT', path: `${sheet}/grades`, json: { grades: [{ student: A, score: 20 }] } },
+      { method: 'POST', path: `${sheet}/publish` },
+      { method: 'GET', path: `/api/analytics/groups/${w.g1}` },
+    ];
+    const studentOnly: Endpoint[] = [
+      { method: 'GET', path: '/api/grades/me' },
+      { method: 'GET', path: '/api/analytics/me' },
+      { method: 'GET', path: '/api/analytics/me/report.pdf' },
+    ];
+    const signedIn: Endpoint[] = [
+      { method: 'GET', path: '/api/resources/equipment' },
+      { method: 'GET', path: `/api/resources/equipment/${equipment}` },
+      { method: 'GET', path: `/api/bookings/availability?resourceType=ROOM&resource=${w.roomId}` },
+      { method: 'GET', path: `/api/bookings/free-rooms?from=${campusDay(7)}&to=${campusDay(8)}` },
+      { method: 'GET', path: '/api/bookings/me' },
+      { method: 'POST', path: '/api/bookings', json: {} },
+      { method: 'GET', path: `/api/bookings/${booking}` },
+      { method: 'POST', path: `/api/bookings/${booking}/cancel`, json: { version: 0 } },
+      { method: 'GET', path: '/api/forum/questions' },
+      { method: 'GET', path: '/api/forum/questions/similar?title=security' },
+      { method: 'GET', path: '/api/forum/tags' },
+      { method: 'GET', path: '/api/forum/leaderboard' },
+      { method: 'GET', path: '/api/forum/profiles/me' },
+      { method: 'GET', path: `/api/forum/profiles/${A}` },
+      { method: 'POST', path: '/api/forum/questions', json: {} },
+      { method: 'GET', path: `/api/forum/questions/${question}` },
+      { method: 'PATCH', path: `/api/forum/questions/${question}`, json: { title: 'Hacked question title' } },
+      { method: 'DELETE', path: `/api/forum/questions/${question}` },
+      { method: 'POST', path: `/api/forum/questions/${question}/answers`, json: { body: 'Anonymous answer' } },
+      { method: 'POST', path: `/api/forum/questions/${question}/accept`, json: { answerId: answer } },
+      { method: 'POST', path: `/api/forum/questions/${question}/vote`, json: { value: 1 } },
+      { method: 'POST', path: `/api/forum/questions/${question}/follow` },
+      { method: 'DELETE', path: `/api/forum/questions/${question}/follow` },
+      { method: 'POST', path: `/api/forum/questions/${question}/report`, json: { reason: 'Anonymous report' } },
+      { method: 'PATCH', path: `/api/forum/answers/${answer}`, json: { body: 'Hacked' } },
+      { method: 'DELETE', path: `/api/forum/answers/${answer}` },
+      { method: 'POST', path: `/api/forum/answers/${answer}/vote`, json: { value: 1 } },
+      { method: 'POST', path: `/api/forum/answers/${answer}/report`, json: { reason: 'Anonymous report' } },
+      { method: 'GET', path: '/api/attendance/me' },
+    ];
+    // teacher2 teaches the subject to g2 only: teacher1's session, assessment and group are out of reach.
+    const otherTeacher: [Endpoint, string?][] = [
+      [{ method: 'GET', path: `/api/attendance/sessions/${pastA}` }],
+      [{ method: 'PUT', path: `/api/attendance/sessions/${pastA}`, json: { records: [{ student: A, status: 'PRESENT' }] } }],
+      [{ method: 'POST', path: '/api/grades/assessments', json: newAssessment }, 'NOT_TEACHING'],
+      [{ method: 'GET', path: sheet }, 'NOT_TEACHING'],
+      [{ method: 'PATCH', path: sheet, json: { title: 'Hacked' } }, 'NOT_TEACHING'],
+      [{ method: 'DELETE', path: sheet }, 'NOT_TEACHING'],
+      [{ method: 'GET', path: `${sheet}/grades` }, 'NOT_TEACHING'],
+      [{ method: 'PUT', path: `${sheet}/grades`, json: { grades: [{ student: A, score: 0 }] } }, 'NOT_TEACHING'],
+      [{ method: 'POST', path: `${sheet}/publish` }, 'NOT_TEACHING'],
+      [{ method: 'GET', path: `/api/analytics/groups/${w.g1}` }, 'NOT_TEACHING'],
+    ];
+
+    const failures: string[] = [];
+    const attempt = async (who: string, token: string | undefined, ep: Endpoint, status: number, code: string, reason?: string) => {
+      const res = await call(ep.method, ep.path, { token, json: ep.json });
+      expectAnswer(failures, `${who} ${ep.method} ${ep.path}`, res, status, code);
+      if (reason && res.status === status && res.body?.details?.reason !== reason) {
+        failures.push(`${who} ${ep.method} ${ep.path}: details.reason ${res.body?.details?.reason}, expected ${reason}`);
+      }
+    };
+    for (const ep of [...adminOnly, ...staff, ...studentOnly, ...signedIn]) await attempt('anonymous', undefined, ep, 401, 'AUTH_REQUIRED');
+    for (const ep of [...adminOnly, ...staff]) {
+      await attempt('STUDENT', w.studentA.token, ep, 403, 'FORBIDDEN');
+      await attempt('ALUMNI', w.alumni.token, ep, 403, 'FORBIDDEN');
+    }
+    for (const ep of adminOnly) await attempt('TEACHER', w.teacher1.token, ep, 403, 'FORBIDDEN');
+    for (const ep of studentOnly) {
+      for (const [who, person] of [['TEACHER', w.teacher1], ['ADMIN', w.admin], ['ALUMNI', w.alumni]] as const) {
+        await attempt(who, person.token, ep, 403, 'FORBIDDEN');
+      }
+    }
+    const day = campusDay(9);
+    await attempt('ALUMNI', w.alumni.token, {
+      method: 'POST',
+      path: '/api/bookings',
+      json: { resourceType: 'ROOM', room: w.roomId, startsAt: `${day}T08:00`, endsAt: `${day}T09:00`, purpose: 'Alumni booking' },
+    }, 403, 'FORBIDDEN');
+    for (const [ep, reason] of otherTeacher) await attempt('teacher2', w.teacher2.token, ep, 403, 'FORBIDDEN', reason);
+    await attempt('teacher1', w.teacher1.token, { method: 'GET', path: `/api/attendance/sessions/${w.sessionB}` }, 403, 'FORBIDDEN');
+    await attempt('teacher1', w.teacher1.token, { method: 'POST', path: '/api/grades/assessments', json: { ...newAssessment, group: w.g2 } }, 403, 'FORBIDDEN', 'NOT_TEACHING');
+    // Lists only show what the caller may manage.
+    const listed = await call('GET', `/api/grades/assessments?group=${w.g1}&subject=${w.subjectId}`, { token: w.teacher2.token });
+    if (listed.status !== 200 || (listed.body.items as any[]).some((item) => item.id === assessment)) failures.push(`teacher2 lists teacher1's assessment (${listed.status})`);
+    const sessions = await call('GET', `/api/attendance/sessions?from=${campusDay(-3)}&to=${campusDay(1)}&teacher=${w.teacher1.id}`, { token: w.teacher2.token });
+    if (sessions.status !== 200 || (sessions.body.items as any[]).some((item) => item.session.id === pastA)) failures.push(`teacher2 lists teacher1's session (${sessions.status})`);
+    expect(failures).toEqual([]);
+
+    // The refused calls changed nothing.
+    const admin = w.admin.token;
+    expect((await call('GET', `/api/resources/equipment/${equipment}`, { token: admin })).body.name).not.toBe('Hacked');
+    expect((await call('GET', `/api/bookings/${booking}`, { token: admin })).body).toMatchObject({ status: 'PENDING', version: 0 });
+    const detail = await call('GET', `/api/forum/questions/${question}`, { token: admin });
+    expect(detail.body.question).toMatchObject({ hidden: false, title: expect.stringMatching(/^Security question/) });
+    expect((detail.body.answers as any[]).find((item) => item.id === answer)).toMatchObject({ hidden: false, body: 'A certified answer.' });
+    const reports = await call('GET', '/api/forum/reports?status=OPEN&limit=100', { token: admin });
+    expect((reports.body.items as any[]).map((item) => item.id)).toContain(report);
+    const kept = await call('GET', sheet, { token: admin });
+    expect(kept.status).toBe(200);
+    expect(kept.body).toMatchObject({ published: false, title: expect.stringMatching(/^Exam /) });
+    expect(((await call('GET', `${sheet}/grades`, { token: admin })).body.grades as any[]).every((item) => item.score === null)).toBe(true);
+    expect(((await call('GET', `/api/attendance/sessions/${pastA}`, { token: admin })).body.roster as any[]).every((item) => item.status === null)).toBe(true);
+  });
+
+  test("bookings: another user's booking can be neither read nor cancelled, and its owner and purpose never reach non-admins", async () => {
+    const marker = `purpose-${rand()}`;
+    const day = campusDay(7);
+    const A = w.studentA;
+    const own = await call('POST', '/api/bookings', {
+      token: A.token,
+      json: { resourceType: 'ROOM', room: w.roomId, startsAt: `${day}T10:00`, endsAt: `${day}T11:00`, purpose: `Private ${marker}` },
+    });
+    expect(own.status, own.text).toBe(201);
+    expect(own.body).toMatchObject({ status: 'CONFIRMED', version: 0, user: { id: A.id } });
+    const id = own.body.id as string;
+    const privateValues = { "the owner's id": A.id, 'the purpose': marker, 'the booking id': id };
+    const failures: string[] = [];
+    const availability = (token: string) =>
+      call('GET', `/api/bookings/availability?resourceType=ROOM&resource=${w.roomId}&from=${day}&to=${campusDay(8)}`, { token });
+    const overlapping = { resourceType: 'ROOM', room: w.roomId, startsAt: `${day}T10:30`, endsAt: `${day}T11:30`, purpose: 'Overlap attempt' };
+
+    for (const [who, person] of [['student B', w.studentB], ['teacher 2', w.teacher2], ['alumni', w.alumni]] as const) {
+      expectAnswer(failures, `${who} GET`, await call('GET', `/api/bookings/${id}`, { token: person.token }), 404, 'RESOURCE_NOT_FOUND');
+      expectAnswer(failures, `${who} cancel`, await call('POST', `/api/bookings/${id}/cancel`, { token: person.token, json: { version: 0 } }), 404, 'RESOURCE_NOT_FOUND');
+      mentions(failures, `${who} /bookings/me`, await call('GET', '/api/bookings/me?limit=100', { token: person.token }), privateValues);
+
+      const busy = await availability(person.token);
+      expectAnswer(failures, `${who} availability`, busy, 200);
+      const entry = (busy.body?.busy as any[] | undefined)?.find((item) => item.kind === 'BOOKING' && item.startsAt === own.body.startsAt);
+      if (!entry) failures.push(`${who}: the booking is missing from the availability`);
+      else if (entry.mine !== false || ['user', 'purpose', 'bookingId'].some((key) => key in entry)) failures.push(`${who} availability entry: ${JSON.stringify(entry)}`);
+      mentions(failures, `${who} availability`, busy, privateValues);
+
+      if (person !== w.alumni) {
+        const conflict = await call('POST', '/api/bookings', { token: person.token, json: overlapping });
+        expectAnswer(failures, `${who} overlapping booking`, conflict, 409, 'BOOKING_CONFLICT');
+        for (const item of (conflict.body?.details?.conflicts as any[] | undefined) ?? []) {
+          const extra = Object.keys(item).filter((key) => !['kind', 'startsAt', 'endsAt', 'mine'].includes(key));
+          if (extra.length > 0) failures.push(`${who} conflict exposes ${extra.join(', ')}`);
+        }
+        mentions(failures, `${who} conflict`, conflict, privateValues);
+      }
+    }
+    expect(failures).toEqual([]);
+
+    // Positive controls: admins see who booked and why; the owner keeps the booking and can cancel it.
+    const adminView = await availability(w.admin.token);
+    expect((adminView.body.busy as any[]).find((item) => item.bookingId === id)).toMatchObject({ user: { id: A.id }, purpose: `Private ${marker}` });
+    const adminConflict = await call('POST', '/api/bookings', { token: w.admin.token, json: overlapping });
+    expect(adminConflict.status).toBe(409);
+    expect(adminConflict.body.details.conflicts[0]).toMatchObject({ bookingId: id, user: { id: A.id } });
+    expect((await call('GET', `/api/bookings/${id}`, { token: A.token })).body).toMatchObject({ status: 'CONFIRMED', version: 0 });
+    expect((await call('POST', `/api/bookings/${id}/cancel`, { token: A.token, json: { version: 0 } })).body).toMatchObject({ status: 'CANCELLED', cancelledBy: 'OWNER' });
+  });
+
+  test('bookings: status, owner and version cannot be forged; one winner per slot under concurrency; stale versions get 409', async () => {
+    const day = campusDay(8);
+    const A = w.studentA;
+    const admin = w.admin.token;
+    const forged = {
+      status: 'CONFIRMED',
+      user: w.admin.id,
+      version: 42,
+      decision: { by: w.admin.id, at: new Date().toISOString(), note: 'Self-approved' },
+      reminderSentAt: new Date().toISOString(),
+      userSnapshot: { firstname: 'Ada', lastname: 'Admin', role: 'ADMIN' },
+      source: 'SEED',
+      id: w.admin.id,
+      _id: w.admin.id,
+      createdAt: '2000-01-01T00:00:00.000Z',
+    };
+    const created = await call('POST', '/api/bookings', {
+      token: A.token,
+      json: { resourceType: 'EQUIPMENT', equipment: p.camera, startsAt: `${day}T12:00`, endsAt: `${day}T13:00`, purpose: 'Forged fields', ...forged },
+    });
+    expect(created.status, created.text).toBe(201);
+    expect(created.body).toMatchObject({ status: 'PENDING', version: 0, decision: null, user: { id: A.id, role: 'STUDENT' } });
+    expect(created.body.id).not.toBe(w.admin.id);
+    expect(new Date(created.body.createdAt).getUTCFullYear()).toBeGreaterThan(2000);
+    // Cancel only reads the version.
+    const cancelled = await call('POST', `/api/bookings/${created.body.id}/cancel`, {
+      token: A.token,
+      json: { version: 0, status: 'CONFIRMED', user: w.studentB.id, cancelledBy: 'ADMIN' },
+    });
+    expect(cancelled.status, cancelled.text).toBe(200);
+    expect(cancelled.body).toMatchObject({ status: 'CANCELLED', version: 1, cancelledBy: 'OWNER', user: { id: A.id } });
+
+    // Double booking: six simultaneous requests whose intervals all share 14:30-14:45 (teachers and admins have no limit).
+    const intervals = [['14:00', '15:30'], ['14:15', '15:00'], ['14:30', '14:45'], ['13:45', '14:45'], ['14:30', '16:00'], ['14:00', '15:30']];
+    const people = [w.teacher1, w.teacher2, w.admin, w.teacher1, w.teacher2, w.admin];
+    const race = await Promise.all(
+      intervals.map(([start, end], i) =>
+        call('POST', '/api/bookings', {
+          token: people[i].token,
+          json: { resourceType: 'ROOM', room: w.roomId, startsAt: `${day}T${start}`, endsAt: `${day}T${end}`, purpose: `Race ${i}` },
+        })
+      )
+    );
+    const outcomes = race.map((res) => `${res.status} ${res.body?.code ?? ''}`.trim());
+    expect(outcomes.filter((item) => item === '201'), outcomes.join(' | ')).toHaveLength(1);
+    expect(outcomes.filter((item) => item === '409 BOOKING_CONFLICT'), outcomes.join(' | ')).toHaveLength(intervals.length - 1);
+    const active = await call('GET', `/api/bookings?resource=${w.roomId}&status=PENDING,CONFIRMED&from=${day}T13:00&to=${day}T17:00`, { token: admin });
+    expect(active.status, active.text).toBe(200);
+    expect(active.body.total).toBe(1);
+
+    // Optimistic locking: two admins deciding at once, then stale versions.
+    const pending = await call('POST', '/api/bookings', {
+      token: w.studentC.token,
+      json: { resourceType: 'EQUIPMENT', equipment: p.camera, startsAt: `${day}T16:00`, endsAt: `${day}T17:00`, purpose: 'Decision race' },
+    });
+    expect(pending.status, pending.text).toBe(201);
+    expect(pending.body).toMatchObject({ status: 'PENDING', version: 0 });
+    const target = `/api/bookings/${pending.body.id}`;
+    const decisions = await Promise.all([
+      call('POST', `${target}/approve`, { token: admin, json: { version: 0 } }),
+      call('POST', `${target}/reject`, { token: admin, json: { version: 0, note: 'Race' } }),
+    ]);
+    const decided = decisions.map((res) => `${res.status} ${res.body?.code ?? ''}`.trim()).sort();
+    expect(decided).toEqual(['200', '409 VERSION_CONFLICT']);
+    const failures: string[] = [];
+    expectAnswer(failures, 'owner cancel with a stale version', await call('POST', `${target}/cancel`, { token: w.studentC.token, json: { version: 0 } }), 409, 'VERSION_CONFLICT');
+    expectAnswer(failures, 'approve with a stale version', await call('POST', `${target}/approve`, { token: admin, json: { version: 0 } }), 409, 'VERSION_CONFLICT');
+    expectAnswer(failures, 'approve with a future version', await call('POST', `${target}/approve`, { token: admin, json: { version: 7 } }), 409, 'VERSION_CONFLICT');
+    expect(failures).toEqual([]);
+    const winner = decisions.find((res) => res.status === 200)!;
+    expect((await call('GET', target, { token: w.studentC.token })).body).toMatchObject({ status: winner.body.status, version: 1 });
+  });
+
+  test('bookings: the admins get one request notification per requester every 10 minutes, not one per request', async () => {
+    const admin = w.admin.token;
+    const requester = await createUser(admin, 'STUDENT');
+    const control = await createUser(admin, 'STUDENT');
+    const day = campusDay(10);
+    const request = async (person: Person, start: string, end: string) => {
+      const res = await call('POST', '/api/bookings', {
+        token: person.token,
+        json: { resourceType: 'EQUIPMENT', equipment: p.camera, startsAt: `${day}T${start}`, endsAt: `${day}T${end}`, purpose: 'Notification flood check' },
+      });
+      expect(res.status, res.text).toBe(201);
+      expect(res.body.status).toBe('PENDING');
+      return res.body.id as string;
+    };
+    // Booking ids of the BOOKING notifications the admin received (newest first).
+    const notified = async () => {
+      const res = await call('GET', '/api/notifications?limit=100', { token: admin });
+      expect(res.status, res.text).toBe(200);
+      return (res.body.items as any[]).filter((item) => item.type === 'BOOKING').map((item) => item.data?.bookingId as string);
+    };
+    const until = (id: string, what: string) => waitFor(async () => ((await notified()).includes(id) ? true : undefined), what);
+
+    const first = await request(requester, '08:00', '09:00');
+    await until(first, "the admin's notification of the first request");
+    const later = [await request(requester, '09:00', '10:00'), await request(requester, '10:00', '11:00')];
+    // Another requester is notified as usual; once that notification is there, the later ones would be too.
+    await until(await request(control, '11:00', '12:00'), "the admin's notification of another requester");
+    await pause(1000);
+    expect((await notified()).filter((id) => later.includes(id)), 'notifications of the later requests (same requester, < 10 min)').toEqual([]);
+    // The requests themselves still reach the admins' queue.
+    const queue = await call('GET', `/api/bookings?status=PENDING&user=${requester.id}&limit=100`, { token: admin });
+    expect(queue.status, queue.text).toBe(200);
+    expect((queue.body.items as any[]).map((item) => item.id).sort()).toEqual([first, ...later].sort());
+  });
+
+  test('bookings: creating and cancelling are rate limited per user, whatever the role (429 TOO_MANY_REQUESTS, security backend)', async () => {
+    const base = SECURITY_API_URL;
+    const adminEmail = uniqueEmail('sec-booking-admin');
+    const adminPassword = secret('password', `Sec-${rand()}-Admin-Passw0rd!`);
+    createAdmin(adminEmail, adminPassword, 'Ada', 'Admin', SECURITY_MONGO_URI);
+    const admin = await login(adminEmail, adminPassword, base);
+    const person = async (role: string) => {
+      const email = uniqueEmail(`sec-booking-${role.toLowerCase()}`);
+      const password = secret('password', `Sec-${rand()}-Passw0rd!`);
+      const res = await call('POST', '/api/users', { base, token: admin.token, json: { firstname: 'Rate', lastname: role, email, password, role } });
+      expect(res.status, `create ${role}: ${res.text}`).toBe(201);
+      return login(email, password, base);
+    };
+    const student = await person('STUDENT');
+    const teacher = await person('TEACHER');
+    const other = await person('STUDENT');
+
+    // The limiter runs before the controller: refused bodies (400) and unknown bookings (404) are counted too.
+    const create = (token: string) => call('POST', '/api/bookings', { base, token, json: {} });
+    const cancel = (token: string) =>
+      call('POST', `/api/bookings/${crypto.randomBytes(12).toString('hex')}/cancel`, { base, token, json: { version: 0 } });
+    const statuses = async (count: number, send: () => Promise<Res>) => {
+      const seen: number[] = [];
+      for (let i = 0; i < count; i += 1) seen.push((await send()).status);
+      return seen;
+    };
+    const limited = (label: string, res: Res) => {
+      expect(res.status, `${label}: ${res.text}`).toBe(429);
+      expect(res.body.code).toBe('TOO_MANY_REQUESTS');
+      expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
+      expect(res.body.details.retryAfter).toBeGreaterThan(0);
+      expect(res.headers['ratelimit-policy']).toBe(`${RATE_LIMIT_BOOKING_MAX};w=3600`);
+    };
+    // A create / cancel loop would notify every admin each time (teachers have no booking limit).
+    for (const [who, token] of [['student', student.token], ['teacher', teacher.token]] as const) {
+      expect(await statuses(RATE_LIMIT_BOOKING_MAX, () => create(token)), `${who} creations`).toEqual(Array(RATE_LIMIT_BOOKING_MAX).fill(400));
+      limited(`${who} creation`, await create(token));
+      expect(await statuses(RATE_LIMIT_BOOKING_MAX, () => cancel(token)), `${who} cancellations`).toEqual(Array(RATE_LIMIT_BOOKING_MAX).fill(404));
+      limited(`${who} cancellation`, await cancel(token));
+    }
+    // One counter per user, not per address: another student calling from the same address is not blocked.
+    expect((await create(other.token)).status).toBe(400);
+    expect((await cancel(other.token)).status).toBe(404);
+  });
+
+  test('forum: hidden content stays invisible to others; authors, scores, certification and moderation fields cannot be forged', async () => {
+    const A = w.studentA;
+    const admin = w.admin.token;
+    const word = `zq${rand()}`;
+    const failures: string[] = [];
+
+    // Mass assignment.
+    const forged = {
+      score: 999,
+      author: w.admin.id,
+      authorSnapshot: { firstname: 'Ada', lastname: 'Admin', role: 'ADMIN' },
+      hidden: true,
+      hiddenReason: 'Forged',
+      viewCount: 999,
+      answerCount: 9,
+      answersTotal: 9,
+      acceptedAnswer: p.answer,
+      acceptedAnswerId: p.answer,
+      hasCertifiedAnswer: true,
+      deleting: true,
+      createdAt: '2000-01-01T00:00:00.000Z',
+      lastActivityAt: '2000-01-01T00:00:00.000Z',
+      id: w.admin.id,
+      _id: w.admin.id,
+    };
+    const asked = await call('POST', '/api/forum/questions', {
+      token: A.token,
+      json: { title: `Hidden ${word} question about moderation`, body: `Body ${word} of a question that the moderation team hides.`, subject: w.subjectId, tags: [word], status: 'CLOSED', ...forged },
+    });
+    expect(asked.status, asked.text).toBe(201);
+    expect(asked.body).toMatchObject({
+      author: { id: A.id, role: 'STUDENT' },
+      score: 0,
+      hidden: false,
+      viewCount: 0,
+      answerCount: 0,
+      acceptedAnswerId: null,
+      hasCertifiedAnswer: false,
+      status: 'OPEN',
+    });
+    expect(asked.body.id).not.toBe(w.admin.id);
+    expect(new Date(asked.body.createdAt).getUTCFullYear()).toBeGreaterThan(2000);
+    const id = asked.body.id as string;
+    expectAnswer(failures, 'PATCH with forged fields only', await call('PATCH', `/api/forum/questions/${id}`, { token: A.token, json: forged }), 400, 'NO_CHANGES');
+    const studentAnswer = await call('POST', `/api/forum/questions/${p.question}/answers`, {
+      token: w.studentC.token,
+      json: { body: 'An answer written by a student', certified: true, accepted: true, score: 50, author: w.teacher1.id, hidden: true, question: id, questionId: id },
+    });
+    expect(studentAnswer.status, studentAnswer.text).toBe(201);
+    expect(studentAnswer.body).toMatchObject({
+      questionId: p.question,
+      author: { id: w.studentC.id, role: 'STUDENT' },
+      certified: false,
+      accepted: false,
+      score: 0,
+      hidden: false,
+    });
+
+    // Votes: +1 / -1 numbers only, never on one's own content, a repeated vote removes the first one.
+    const voteUrl = `/api/forum/questions/${p.question}/vote`;
+    for (const value of [5, '1', 0, null, { $gt: 0 }]) {
+      expectAnswer(failures, `vote ${JSON.stringify(value)}`, await call('POST', voteUrl, { token: A.token, json: { value } }), 400, 'VALIDATION_ERROR');
+    }
+    expectAnswer(failures, 'vote on own question', await call('POST', voteUrl, { token: w.studentB.token, json: { value: 1 } }), 403, 'FORBIDDEN');
+    expect((await call('POST', voteUrl, { token: A.token, json: { value: 1 } })).body).toEqual({ score: 1, myVote: 1 });
+    expect((await call('POST', voteUrl, { token: A.token, json: { value: 1 } })).body).toEqual({ score: 0, myVote: 0 });
+
+    // Author-only actions (admins moderate, they do not edit other people's content).
+    const authorOnly: [string, string, unknown][] = [
+      ['PATCH', `/api/forum/questions/${p.question}`, { title: 'Hijacked question title' }],
+      ['DELETE', `/api/forum/questions/${p.question}`, undefined],
+      ['POST', `/api/forum/questions/${p.question}/accept`, { answerId: p.answer }],
+      ['PATCH', `/api/forum/answers/${p.answer}`, { body: 'Hijacked answer' }],
+      ['DELETE', `/api/forum/answers/${p.answer}`, undefined],
+    ];
+    for (const [method, url, json] of authorOnly) {
+      expectAnswer(failures, `student C ${method} ${url}`, await call(method, url, { token: w.studentC.token, json }), 403, 'FORBIDDEN');
+    }
+    for (const [method, url, json] of [authorOnly[0], authorOnly[2], authorOnly[3]]) {
+      expectAnswer(failures, `admin ${method} ${url}`, await call(method, url, { token: admin, json }), 403, 'FORBIDDEN');
+    }
+
+    // Moderation: a hidden question and a hidden answer.
+    const hidden = await call('POST', `/api/forum/questions/${id}/hide`, { token: admin, json: { reason: 'Off topic' } });
+    expect(hidden.status, hidden.text).toBe(200);
+    expect(hidden.body).toMatchObject({ hidden: true, hiddenReason: 'Off topic' });
+    const secretAnswer = `answer-${rand()}`;
+    const t2 = await call('POST', `/api/forum/questions/${p.question}/answers`, { token: w.teacher2.token, json: { body: `Hidden answer ${secretAnswer}` } });
+    expect(t2.status, t2.text).toBe(201);
+    expect((await call('POST', `/api/forum/answers/${t2.body.id}/hide`, { token: admin, json: {} })).body).toMatchObject({ hidden: true });
+
+    const reads = [
+      `/api/forum/questions?q=${word}`,
+      `/api/forum/questions?tag=${word}`,
+      '/api/forum/questions?limit=100',
+      `/api/forum/questions?subject=${w.subjectId}&sort=unanswered&limit=100`,
+      `/api/forum/questions/similar?title=${word}`,
+      `/api/forum/tags?subject=${w.subjectId}&limit=50`,
+    ];
+    const blocked: [string, string, unknown][] = [
+      ['GET', `/api/forum/questions/${id}`, undefined],
+      ['PATCH', `/api/forum/questions/${id}`, { title: 'Editing a hidden question' }],
+      ['DELETE', `/api/forum/questions/${id}`, undefined],
+      ['POST', `/api/forum/questions/${id}/answers`, { body: 'Answering a hidden question' }],
+      ['POST', `/api/forum/questions/${id}/vote`, { value: 1 }],
+      ['POST', `/api/forum/questions/${id}/follow`, undefined],
+      ['POST', `/api/forum/questions/${id}/report`, { reason: 'I can still see it' }],
+      ['POST', `/api/forum/answers/${t2.body.id}/vote`, { value: 1 }],
+      ['POST', `/api/forum/answers/${t2.body.id}/report`, { reason: 'I can still see it' }],
+      ['PATCH', `/api/forum/answers/${t2.body.id}`, { body: 'Editing a hidden answer' }],
+    ];
+    for (const [who, person] of [['student B', w.studentB], ['student D', p.studentD], ['teacher 1', w.teacher1], ['alumni', w.alumni]] as const) {
+      for (const url of reads) {
+        const res = await call('GET', url, { token: person.token });
+        expectAnswer(failures, `${who} GET ${url}`, res, 200);
+        mentions(failures, `${who} GET ${url}`, res, { 'the hidden question': id, 'its tag': word });
+      }
+      for (const [method, url, json] of blocked) {
+        expectAnswer(failures, `${who} ${method} ${url}`, await call(method, url, { token: person.token, json }), 404, 'RESOURCE_NOT_FOUND');
+      }
+    }
+    for (const [who, person] of [['student A', A], ['student C', w.studentC], ['alumni', w.alumni]] as const) {
+      const thread = await call('GET', `/api/forum/questions/${p.question}`, { token: person.token });
+      expectAnswer(failures, `${who} thread`, thread, 200);
+      mentions(failures, `${who} thread`, thread, { 'the hidden answer': t2.body.id, 'its text': secretAnswer });
+    }
+    expect(failures).toEqual([]);
+
+    // Positive controls: the authors and the admins still see the hidden content, with its notice.
+    expect((await call('GET', `/api/forum/questions/${id}`, { token: A.token })).body.question).toMatchObject({ hidden: true, hiddenReason: 'Off topic' });
+    expect(((await call('GET', `/api/forum/questions?q=${word}`, { token: admin })).body.items as any[]).map((item) => item.id)).toContain(id);
+    expect(((await call('GET', `/api/forum/questions/${p.question}`, { token: w.teacher2.token })).body.answers as any[]).find((item) => item.id === t2.body.id)).toMatchObject({ hidden: true });
+  });
+
+  test('attendance: the session teacher (inside the window) or an admin, roster students only, EXCUSED for admins, marks cannot be forged', async () => {
+    const t1 = w.teacher1.token;
+    const A = w.studentA.id;
+    const D = p.studentD.id;
+    const url = `/api/attendance/sessions/${p.pastA}`;
+    const save = (token: string, json: unknown) => call('PUT', url, { token, json });
+    const failures: string[] = [];
+
+    const saved = await save(t1, {
+      session: w.sessionB,
+      markedBy: w.teacher2.id,
+      records: [{ student: A, status: 'ABSENT', note: 'Forged fields', markedBy: w.teacher2.id, markedAt: '2000-01-01T00:00:00.000Z', session: w.sessionB, id: w.admin.id }],
+    });
+    expect(saved.status, saved.text).toBe(200);
+    expect(saved.body.session.id).toBe(p.pastA);
+    const row = (saved.body.roster as any[]).find((item) => item.student.id === A);
+    expect(row).toMatchObject({ status: 'ABSENT' });
+    expect(new Date(row.markedAt).getUTCFullYear()).toBeGreaterThan(2000);
+    const own = await call('GET', '/api/attendance/me', { token: w.studentA.token });
+    const record = (own.body.items as any[]).find((item) => item.session.id === p.pastA);
+    expect(record).toMatchObject({ status: 'ABSENT', student: { id: A }, markedBy: { id: w.teacher1.id } });
+    expect((own.body.items as any[]).some((item) => item.session.id === w.sessionB)).toBe(false);
+
+    // Other students never get A's records.
+    for (const [who, person] of [['student D (same group)', p.studentD], ['student B', w.studentB], ['student C', w.studentC]] as const) {
+      const res = await call('GET', '/api/attendance/me', { token: person.token });
+      expectAnswer(failures, `${who} /attendance/me`, res, 200);
+      mentions(failures, `${who} /attendance/me`, res, { "student A's id": A, "student A's record": record.id });
+    }
+
+    expectAnswer(failures, 'student of another group', await save(t1, { records: [{ student: w.studentB.id, status: 'ABSENT' }] }), 400, 'VALIDATION_ERROR');
+    expectAnswer(failures, 'teacher (not a student)', await save(t1, { records: [{ student: w.teacher2.id, status: 'ABSENT' }] }), 400, 'VALIDATION_ERROR');
+    const excuse = await save(t1, { records: [{ student: D, status: 'EXCUSED' }] });
+    expectAnswer(failures, 'teacher sets EXCUSED', excuse, 403, 'FORBIDDEN');
+    if (excuse.body?.details?.reason !== 'EXCUSED_ADMIN_ONLY') failures.push(`teacher sets EXCUSED: reason ${excuse.body?.details?.reason}`);
+    expect((await save(w.admin.token, { records: [{ student: D, status: 'EXCUSED' }] })).status).toBe(200);
+    for (const status of ['PRESENT', 'ABSENT', null]) {
+      expectAnswer(failures, `teacher changes EXCUSED to ${status}`, await save(t1, { records: [{ student: D, status }] }), 403, 'FORBIDDEN');
+    }
+    const early = await call('PUT', `/api/attendance/sessions/${w.sessionA}`, { token: t1, json: { records: [{ student: A, status: 'PRESENT' }] } });
+    expectAnswer(failures, 'teacher before the roll call opens', early, 403, 'FORBIDDEN');
+    if (early.body?.details?.reason !== 'ROLL_CALL_NOT_OPEN') failures.push(`early roll call: reason ${early.body?.details?.reason}`);
+    expect(failures).toEqual([]);
+
+    const after = await call('GET', url, { token: w.admin.token });
+    expect((after.body.roster as any[]).find((item) => item.student.id === D)).toMatchObject({ status: 'EXCUSED' });
+    expect((after.body.roster as any[]).map((item) => item.student.id)).not.toContain(w.studentB.id);
+  });
+
+  test("grades: unpublished grades stay hidden, nobody reads another student's score, publication and authorship cannot be forged", async () => {
+    const t1 = w.teacher1.token;
+    const A = w.studentA;
+    const base = `/api/grades/assessments/${p.assessment}`;
+    const marker = `comment-${rand()}`;
+    const failures: string[] = [];
+
+    const fields = { subject: w.subjectId, group: w.g1, title: `Forged ${rand()}`, type: 'QUIZ', date: campusDay(0) };
+    const forgedCreate = await call('POST', '/api/grades/assessments', {
+      token: t1,
+      json: { ...fields, published: true, publishedAt: '2000-01-01T00:00:00.000Z', createdBy: w.admin.id },
+    });
+    expectAnswer(failures, 'create with published / createdBy', forgedCreate, 400, 'VALIDATION_ERROR');
+    for (const json of [{ published: true }, { publishedAt: '2000-01-01T00:00:00.000Z' }, { createdBy: w.admin.id }, { group: w.g2 }, { subject: w.subjectId }]) {
+      expectAnswer(failures, `PATCH ${JSON.stringify(json)}`, await call('PATCH', base, { token: t1, json }), 400, 'VALIDATION_ERROR');
+    }
+    const sheet = await call('PUT', `${base}/grades`, {
+      token: t1,
+      json: { published: true, grades: [{ student: A.id, score: 18, comment: `Well done ${marker}`, gradedBy: w.teacher2.id, assessment: w.sessionA, published: true }] },
+    });
+    expect(sheet.status, sheet.text).toBe(200);
+    expect(sheet.body.assessment.published).toBe(false);
+    const invalid: [string, unknown[]][] = [
+      ['score as a string', [{ student: A.id, score: '18' }]],
+      ['score above maxScore', [{ student: A.id, score: 20.5 }]],
+      ['negative score', [{ student: A.id, score: -1 }]],
+      ['missing score', [{ student: A.id }]],
+      ['student of another group', [{ student: w.studentB.id, score: 10 }]],
+    ];
+    for (const [label, grades] of invalid) {
+      expectAnswer(failures, label, await call('PUT', `${base}/grades`, { token: t1, json: { grades } }), 400, 'VALIDATION_ERROR');
+    }
+
+    const views = async (person: Person) => [
+      await call('GET', '/api/grades/me', { token: person.token }),
+      await call('GET', '/api/analytics/me', { token: person.token }),
+    ];
+    const items = (res: Res) => (res.body?.items ?? res.body?.grades?.items ?? []) as any[];
+    // Not published yet: invisible to every student, the graded one included.
+    for (const person of [A, p.studentD]) {
+      for (const res of await views(person)) {
+        expectAnswer(failures, `GET ${res.url}`, res, 200);
+        if (items(res).some((item) => item.id === p.assessment)) failures.push(`unpublished assessment listed by ${res.url} for ${person.email}`);
+        mentions(failures, `${res.url} before publication`, res, { "the teacher's comment": marker });
+      }
+    }
+    // Publication is claimed once.
+    const published = await Promise.all([0, 1, 2].map(() => call('POST', `${base}/publish`, { token: t1 })));
+    expect(published.map((res) => `${res.status} ${res.body?.code ?? ''}`.trim()).sort()).toEqual(['200', '409 INVALID_STATE', '409 INVALID_STATE']);
+    // A sees their score; D sees the assessment without A's score or comment; B (another group) does not see it.
+    for (const res of await views(A)) expect(items(res).find((item) => item.id === p.assessment)).toMatchObject({ score: 18 });
+    for (const res of await views(p.studentD)) {
+      const item = items(res).find((entry) => entry.id === p.assessment);
+      if (!item || item.score !== null) failures.push(`student D ${res.url}: ${JSON.stringify(item)}`);
+      mentions(failures, `student D ${res.url}`, res, { "student A's comment": marker, "student A's id": A.id });
+    }
+    for (const res of await views(w.studentB)) {
+      if (items(res).some((item) => item.id === p.assessment)) failures.push(`student B ${res.url} lists another group's assessment`);
+    }
+    expect(failures).toEqual([]);
+
+    // Published grades never change or disappear without a trace: a teacher cannot delete a published assessment,
+    // and every change is in the audit log (scores, never the comments).
+    const refused = await call('DELETE', base, { token: t1 });
+    expectAnswer(failures, 'teacher deletes a published assessment', refused, 409, 'INVALID_STATE');
+    if (refused.body?.details?.reason !== 'PUBLISHED') failures.push(`teacher deletes a published assessment: reason ${refused.body?.details?.reason}`);
+    expect((await call('GET', base, { token: t1 })).body).toMatchObject({ published: true });
+    const regraded = await call('PUT', `${base}/grades`, { token: t1, json: { grades: [{ student: A.id, score: 17 }] } });
+    expect(regraded.status, regraded.text).toBe(200);
+    const audit = async (assessment: string) => {
+      const res = await call('GET', `/api/audit?targetType=Assessment&targetId=${assessment}&limit=100`, { token: w.admin.token });
+      expect(res.status, res.text).toBe(200);
+      mentions(failures, `audit log of ${assessment}`, res, { "the teacher's comment": marker });
+      return res.body.items as any[];
+    };
+    const entries = await audit(p.assessment);
+    const count = (action: string) => entries.filter((entry) => entry.action === action).length;
+    expect(count('grades.assessment.create'), 'grades.assessment.create entries').toBe(1);
+    // Three concurrent publications, one success: one entry.
+    expect(count('grades.publish'), 'grades.publish entries').toBe(1);
+    expect(count('grades.assessment.delete'), 'grades.assessment.delete entries (the deletion was refused)').toBe(0);
+    const updates = entries.filter((entry) => entry.action === 'grades.update');
+    expect(updates.map((entry) => entry.metadata?.changes)).toEqual(
+      expect.arrayContaining([[{ student: A.id, from: null, to: 18 }], [{ student: A.id, from: 18, to: 17 }]])
+    );
+    const afterPublication = updates.find((entry) => entry.metadata?.changes?.[0]?.to === 17);
+    expect(afterPublication).toMatchObject({ actor: { id: w.teacher1.id }, metadata: { published: true } });
+
+    // An admin can still delete a published assessment: its grades go, the audit log keeps them.
+    const extra = await call('POST', '/api/grades/assessments', { token: t1, json: { ...fields, title: `Deleted ${rand()}` } });
+    expect(extra.status, extra.text).toBe(201);
+    const extraUrl = `/api/grades/assessments/${extra.body.id}`;
+    expect((await call('PUT', `${extraUrl}/grades`, { token: t1, json: { grades: [{ student: A.id, score: 12, comment: `Deleted ${marker}` }] } })).status).toBe(200);
+    expect((await call('POST', `${extraUrl}/publish`, { token: t1 })).status).toBe(200);
+    expectAnswer(failures, 'teacher deletes a published assessment (2)', await call('DELETE', extraUrl, { token: t1 }), 409, 'INVALID_STATE');
+    expectAnswer(failures, 'admin deletes a published assessment', await call('DELETE', extraUrl, { token: w.admin.token }), 204);
+    expectAnswer(failures, 'deleted assessment', await call('GET', extraUrl, { token: w.admin.token }), 404, 'RESOURCE_NOT_FOUND');
+    const deletion = (await audit(extra.body.id)).find((entry) => entry.action === 'grades.assessment.delete');
+    expect(deletion).toMatchObject({
+      actor: { id: w.admin.id },
+      metadata: { assessmentId: extra.body.id, published: true, gradesDeleted: 1, grades: [{ student: A.id, score: 12 }] },
+    });
+    if (items(await call('GET', '/api/grades/me', { token: A.token })).some((item) => item.id === extra.body.id)) failures.push('the deleted assessment is still listed');
+    expect(failures).toEqual([]);
+  });
+
+  test("analytics: a student only gets their own figures and PDF report, admins any student's", async () => {
+    const A = w.studentA;
+    const failures: string[] = [];
+    const mine = await call('GET', '/api/analytics/me?compare=true', { token: w.studentB.token });
+    expect(mine.status, mine.text).toBe(200);
+    expect(mine.body.student.id).toBe(w.studentB.id);
+    mentions(failures, 'student B /analytics/me', mine, { "student A's id": A.id });
+
+    const pdf = (label: string, res: Res) => {
+      const ok =
+        res.status === 200 &&
+        /^application\/pdf/.test(res.headers['content-type'] ?? '') &&
+        res.text.startsWith('%PDF') &&
+        /private/.test(res.headers['cache-control'] ?? '') &&
+        /no-store/.test(res.headers['cache-control'] ?? '') &&
+        /^attachment;/.test(res.headers['content-disposition'] ?? '');
+      if (!ok) failures.push(`${label}: ${res.status} ${res.headers['content-type']} ${res.headers['cache-control']} ${res.headers['content-disposition']}`);
+    };
+    pdf('own report', await call('GET', '/api/analytics/me/report.pdf', { token: A.token }));
+    pdf('admin report of a student', await call('GET', `/api/analytics/students/${A.id}/report.pdf?locale=en`, { token: w.admin.token }));
+    for (const [who, person] of [['student B', w.studentB], ['student D (same group)', p.studentD], ['teacher of the group', w.teacher1], ['alumni', w.alumni]] as const) {
+      for (const suffix of ['', '?compare=true', '/report.pdf', '/report.pdf?locale=fr']) {
+        expectAnswer(failures, `${who} /analytics/students/A${suffix}`, await call('GET', `/api/analytics/students/${A.id}${suffix}`, { token: person.token }), 403, 'FORBIDDEN');
+      }
+    }
+    // The admin student view only serves STUDENT accounts.
+    for (const other of [w.teacher1.id, w.admin.id]) {
+      expectAnswer(failures, `admin view of a non-student ${other}`, await call('GET', `/api/analytics/students/${other}/report.pdf`, { token: w.admin.token }), 404, 'RESOURCE_NOT_FOUND');
+    }
+    // A teacher's group view only covers the subjects they teach there.
+    const group = await call('GET', `/api/analytics/groups/${w.g1}`, { token: w.teacher1.token });
+    expectAnswer(failures, 'teacher1 group view', group, 200);
+    if (((group.body?.subjects as any[]) ?? []).some((subject) => subject.id !== w.subjectId)) failures.push(`teacher1 group view subjects: ${JSON.stringify(group.body.subjects)}`);
+    expect(failures).toEqual([]);
+  });
+
+  test("the opt-in group comparison never reveals one student's grades: every figure comes from at least 5 students", async () => {
+    const admin = w.admin.token;
+    const tag = rand().toUpperCase();
+    const group = await call('POST', '/api/academic/groups', {
+      token: admin,
+      json: { name: `SEC-${tag}-CMP`, level: 4, academicYear: '2026-2027', program: w.programId },
+    });
+    expect(group.status, group.text).toBe(201);
+    const students: Person[] = [];
+    for (let i = 0; i < 5; i += 1) students.push(await createUser(admin, 'STUDENT', group.body.id));
+    // Publishes one assessment of the subject, graded for some students only (the others stay ungraded: null).
+    const publish = async (title: string, scores: [number, number][]) => {
+      const assessment = await call('POST', '/api/grades/assessments', {
+        token: admin,
+        json: { subject: w.subjectId, group: group.body.id, title: `${title} ${tag}`, type: 'EXAM', date: campusDay(0) },
+      });
+      expect(assessment.status, assessment.text).toBe(201);
+      const base = `/api/grades/assessments/${assessment.body.id}`;
+      const saved = await call('PUT', `${base}/grades`, { token: admin, json: { grades: scores.map(([i, score]) => ({ student: students[i].id, score })) } });
+      expect(saved.status, saved.text).toBe(200);
+      expect((await call('POST', `${base}/publish`, { token: admin })).status).toBe(200);
+    };
+    // The grade figures student 0 sees: { overall, subject } (null = not shown).
+    const comparison = async () => {
+      const res = await call('GET', '/api/analytics/me?compare=true', { token: students[0].token });
+      expect(res.status, res.text).toBe(200);
+      expect(res.body.comparison).toMatchObject({ available: true, groupSize: 5 });
+      const failures: string[] = [];
+      mentions(failures, 'comparison', res, Object.fromEntries(students.slice(1).map((student, i) => [`student ${i + 1}'s id`, student.id])));
+      expect(failures).toEqual([]);
+      const subject = ((res.body.comparison.grades?.bySubject as any[]) ?? []).find((item) => item.subject?.id === w.subjectId);
+      return { overall: res.body.comparison.grades?.overall ?? null, subject: subject?.average ?? null };
+    };
+
+    // One student sat the retake: a "group average" would be that student's own average (15.5 / 20).
+    await publish('Retake', [[1, 15.5]]);
+    expect(await comparison(), 'figures computed from 1 graded student').toEqual({ overall: null, subject: null });
+    // Four graded students are still too few (from 2, the others' figures can be derived from one's own).
+    await publish('Quiz', [[1, 10], [2, 12], [3, 14], [4, 16]]);
+    expect(await comparison(), 'figures computed from 4 graded students').toEqual({ overall: null, subject: null });
+    // Five: the group average is shown, rounded to 0.5 (averages 8, 12.75, 12, 14 and 16: 12.55 -> 12.5).
+    await publish('Exam', [[0, 8]]);
+    expect(await comparison(), 'figures computed from 5 graded students').toEqual({ overall: 12.5, subject: 12.5 });
+  });
+
+  test('NoSQL operators and regex payloads in the phase 2 bodies, queries and ids are rejected or neutralized', async () => {
+    const admin = w.admin.token;
+    const a = w.studentA.token;
+    const t1 = w.teacher1.token;
+    const ne = { $ne: null };
+    const day = campusDay(9);
+    const bodies: [string, string, string, unknown, number, string][] = [
+      [a, 'POST', '/api/bookings', { resourceType: 'ROOM', room: ne, startsAt: { $gt: '' }, endsAt: { $gt: '' }, purpose: { $ne: '' } }, 400, 'VALIDATION_ERROR'],
+      [a, 'POST', '/api/bookings', { resourceType: { $in: ['ROOM'] }, room: w.roomId, startsAt: `${day}T08:00`, endsAt: `${day}T09:00`, purpose: 'Injection' }, 400, 'VALIDATION_ERROR'],
+      [a, 'POST', `/api/bookings/${p.booking}/cancel`, { version: { $gte: 0 } }, 400, 'VALIDATION_ERROR'],
+      [admin, 'POST', `/api/bookings/${p.booking}/approve`, { version: ne }, 400, 'VALIDATION_ERROR'],
+      [admin, 'POST', '/api/resources/equipment', { name: ne, category: { $ne: '' }, active: { $ne: false } }, 400, 'VALIDATION_ERROR'],
+      [a, 'POST', '/api/forum/questions', { title: ne, body: { $regex: '.*' }, subject: ne, tags: [{ $gt: '' }] }, 400, 'VALIDATION_ERROR'],
+      [a, 'POST', `/api/forum/questions/${p.question}/answers`, { body: ne, clientRequestId: ne }, 400, 'VALIDATION_ERROR'],
+      [w.studentB.token, 'PATCH', `/api/forum/questions/${p.question}`, { status: { $ne: 'OPEN' } }, 400, 'VALIDATION_ERROR'],
+      [w.studentB.token, 'POST', `/api/forum/questions/${p.question}/accept`, { answerId: ne }, 400, 'VALIDATION_ERROR'],
+      [a, 'POST', `/api/forum/answers/${p.answer}/report`, { reason: ne }, 400, 'VALIDATION_ERROR'],
+      [t1, 'PUT', `/api/attendance/sessions/${p.pastA}`, { records: [{ student: ne, status: 'ABSENT' }] }, 400, 'VALIDATION_ERROR'],
+      [t1, 'PUT', `/api/attendance/sessions/${p.pastA}`, { records: [{ student: w.studentA.id, status: { $in: ['EXCUSED'] } }] }, 400, 'VALIDATION_ERROR'],
+      [t1, 'PUT', `/api/attendance/sessions/${p.pastA}`, { records: ne }, 400, 'VALIDATION_ERROR'],
+      [t1, 'POST', '/api/grades/assessments', { subject: ne, group: ne, title: ne, type: 'EXAM', date: { $gt: '' } }, 400, 'VALIDATION_ERROR'],
+      [t1, 'PUT', `/api/grades/assessments/${p.assessment}/grades`, { grades: [{ student: ne, score: { $gt: 0 } }] }, 400, 'VALIDATION_ERROR'],
+      [a, 'GET', `/api/bookings/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [a, 'POST', `/api/bookings/${OPERATOR_ID}/cancel`, { version: 0 }, 400, 'INVALID_ID'],
+      [a, 'GET', `/api/resources/equipment/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [a, 'GET', `/api/forum/questions/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [a, 'POST', `/api/forum/answers/${OPERATOR_ID}/vote`, { value: 1 }, 400, 'INVALID_ID'],
+      [a, 'GET', `/api/forum/profiles/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [t1, 'GET', `/api/attendance/sessions/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [t1, 'GET', `/api/grades/assessments/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [t1, 'GET', `/api/analytics/groups/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+      [admin, 'GET', `/api/analytics/students/${OPERATOR_ID}`, undefined, 400, 'INVALID_ID'],
+    ];
+    const failures: string[] = [];
+    for (const [token, method, url, json, status, code] of bodies) {
+      expectAnswer(failures, `${method} ${url} ${JSON.stringify(json)}`, await call(method, url, { token, json }), status, code);
+    }
+    const queries: [string, string, number, string][] = [
+      [a, `/api/bookings/availability?resourceType=ROOM&resource=.*`, 400, 'VALIDATION_ERROR'],
+      [a, `/api/bookings/availability?resourceType=.*&resource=${w.roomId}`, 400, 'VALIDATION_ERROR'],
+      [a, '/api/bookings/availability?resourceType=ROOM&resource[$ne]=x', 400, 'MISSING_FIELDS'],
+      [a, '/api/bookings/me?status=.*', 400, 'VALIDATION_ERROR'],
+      [a, `/api/bookings/free-rooms?from=${day}&to=${campusDay(10)}&type=.*`, 400, 'VALIDATION_ERROR'],
+      [admin, '/api/bookings?user=.*', 400, 'VALIDATION_ERROR'],
+      [a, '/api/resources/equipment?category=.*', 400, 'VALIDATION_ERROR'],
+      [a, '/api/forum/questions?subject=.*', 400, 'VALIDATION_ERROR'],
+      [a, '/api/forum/questions?sort=%24natural', 400, 'VALIDATION_ERROR'],
+      [a, '/api/forum/questions?level=1%7C%7C1', 400, 'VALIDATION_ERROR'],
+      [a, '/api/forum/questions?status=OPEN&status=CLOSED', 400, 'VALIDATION_ERROR'],
+      [a, '/api/forum/leaderboard?subject=.*', 400, 'VALIDATION_ERROR'],
+      [t1, '/api/grades/assessments?group=.*', 400, 'VALIDATION_ERROR'],
+      [t1, '/api/attendance/sessions?group=.*', 400, 'VALIDATION_ERROR'],
+      [admin, '/api/attendance/alerts?level=.*', 400, 'VALIDATION_ERROR'],
+      [admin, '/api/attendance/alerts?student=.*', 400, 'VALIDATION_ERROR'],
+      [a, '/api/attendance/me?from=.*', 400, 'VALIDATION_ERROR'],
+      [a, '/api/analytics/me/report.pdf?locale=.*', 400, 'VALIDATION_ERROR'],
+    ];
+    for (const [token, url, status, code] of queries) expectAnswer(failures, `GET ${url}`, await call('GET', url, { token }), status, code);
+    // Regex-looking filters are matched literally, never as patterns.
+    for (const url of ['/api/forum/questions?q=.*', '/api/forum/questions?tag=.*', `/api/forum/questions?tag=${encodeURIComponent('^')}`]) {
+      const res = await call('GET', url, { token: admin });
+      if (res.status !== 200 || res.body?.total !== 0) failures.push(`GET ${url}: ${res.status}, total ${res.body?.total} (the pattern was interpreted)`);
+    }
+    expect(failures).toEqual([]);
+    // Nothing was changed by the refused calls.
+    expect((await call('GET', `/api/bookings/${p.booking}`, { token: a })).body).toMatchObject({ status: 'PENDING', version: 0 });
+  });
+});
+
 // ---------------------------------------------------------------- web app (Next.js on 3100)
 
 test.describe('web app', () => {
@@ -959,6 +1823,52 @@ test.describe('web app', () => {
     }
   });
 
+  test('phase 2 through the web app: reports only reach their owner, and forum text is rendered as text, never as HTML', async () => {
+    const failures: string[] = [];
+    const headers = { Cookie: cookie };
+    // The BFF passes the PDF of the signed-in student through, with its private headers...
+    const own = await call('GET', `${WEB_URL}/bff/analytics/me/report.pdf`, { headers });
+    expect(own.status, own.text.slice(0, 200)).toBe(200);
+    expect(own.headers['content-type']).toMatch(/^application\/pdf/);
+    expect(own.text.startsWith('%PDF')).toBe(true);
+    expect(own.headers['cache-control']).toMatch(/no-store/);
+    expect(own.headers['content-disposition']).toMatch(/^attachment;/);
+    // ...but never another student's data, nor staff or admin data.
+    for (const url of [
+      `/bff/analytics/students/${w.studentA.id}/report.pdf`,
+      `/bff/analytics/students/${w.studentA.id}`,
+      `/bff/analytics/groups/${w.g1}`,
+      `/bff/attendance/sessions/${w.sessionA}`,
+      '/bff/attendance/alerts',
+      '/bff/grades/teaching',
+      '/bff/bookings',
+      '/bff/bookings/stats',
+      '/bff/forum/reports',
+    ]) {
+      expectAnswer(failures, `GET ${url}`, await call('GET', `${WEB_URL}${url}`, { headers }), 403, 'FORBIDDEN');
+    }
+    expect(failures).toEqual([]);
+
+    // HTML typed in a question is stored and returned as plain text (JSON, nosniff)...
+    const marker = `xss${rand()}`;
+    const payload = `<img src=x onerror=alert('${marker}')><script>alert('${marker}')</script>`;
+    const asked = await call('POST', '/api/forum/questions', {
+      token: w.studentA.token,
+      json: { title: `${payload} title`, body: `${payload}\nSecond line of the body.`, subject: w.subjectId },
+    });
+    expect(asked.status, asked.text).toBe(201);
+    expect(asked.body.body).toBe(`${payload}\nSecond line of the body.`);
+    expect(asked.headers['content-type']).toMatch(/^application\/json/);
+    expect(asked.headers['x-content-type-options']).toBe('nosniff');
+    // ...and the question page escapes it (title, metadata and body).
+    const page = await call('GET', `${WEB_URL}/dashboard/forum/${asked.body.id}`, { headers: { Cookie: cookie, Accept: 'text/html' } });
+    expect(page.status).toBe(200);
+    expect(page.text).toContain(marker);
+    for (const raw of [`<img src=x onerror=alert('${marker}')`, `<script>alert('${marker}')`]) {
+      expect(page.text.includes(raw), `the question page contains the raw HTML ${raw}`).toBe(false);
+    }
+  });
+
   test('the end of a session wipes the offline data (Clear-Site-Data), and dashboard pages carry their owner', async () => {
     const wipe = '"cache", "storage"';
     const expired = await call('GET', `${WEB_URL}/auth/expired?next=%2Fdashboard`, { headers: { Cookie: cookie } });
@@ -1015,9 +1925,14 @@ test.describe('web app', () => {
     const never = ['/dashboard/admin/users', `/dashboard/admin/users?q=${encodeURIComponent(w.admin.email)}`, '/dashboard/admin/audit',
       '/dashboard/admin/academic', '/dashboard/admin/timetable', '/dashboard/admin/announcements', '/dashboard/admin/announcements/new',
       `/dashboard/admin/announcements/${w.sessionA}/edit`, '/dashboard/account', '/dashboard/unknown', '/login', '/signup',
-      '/reset-password?token=x', '/bff/users/me', '/auth/expired', 'http://evil.example/dashboard'];
+      '/reset-password?token=x', '/bff/users/me', '/auth/expired', 'http://evil.example/dashboard',
+      // Phase 2: admin and staff pages (other students' data) are never saved either.
+      '/dashboard/admin/bookings', '/dashboard/admin/bookings?tab=stats', '/dashboard/admin/forum', '/dashboard/admin/analytics',
+      `/dashboard/admin/analytics/students/${w.studentA.id}`, '/dashboard/attendance', `/dashboard/attendance/${w.sessionA}`,
+      '/dashboard/grades', `/dashboard/grades/${w.sessionA}`, `/dashboard/forum/profile/${w.studentA.id}`, '/bff/analytics/me/report.pdf'];
     for (const route of never) if (kind(route) !== null) failures.push(`${route} would be saved (${kind(route)})`);
-    for (const route of ['/dashboard', '/dashboard/timetable', '/dashboard/announcements', `/dashboard/announcements/${w.sessionA}`, '/dashboard/notifications']) {
+    for (const route of ['/dashboard', '/dashboard/timetable', '/dashboard/announcements', `/dashboard/announcements/${w.sessionA}`, '/dashboard/notifications',
+      '/dashboard/bookings', '/dashboard/forum', `/dashboard/forum/${w.sessionA}`, '/dashboard/analytics']) {
       if (kind(route) !== 'private') failures.push(`${route}: ${kind(route)} instead of private (owner-bound)`);
     }
     if (kind('/') !== 'public') failures.push(`/: ${kind('/')}`);
@@ -1120,5 +2035,32 @@ test('no password hash, OTP, reset token, calendarToken, refresh token, push sec
     }
   }
   expect(answers.length).toBeGreaterThan(30);
+  expect([...leaks]).toEqual([]);
+});
+
+test('phase 2 answers never carry an email address, a raw id, a snapshot or an internal field', async () => {
+  const entries = fs.readFileSync(RECORD_FILE, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line) as Answer | Secret);
+  const answers = entries.filter(
+    (entry): entry is Answer => entry.kind === 'answer' && /^\/(api|bff)\/(resources|bookings|forum|attendance|grades|analytics)(\/|$)/.test(entry.path)
+  );
+  // Authors, owners and students are { id, firstname, lastname, role? }: nothing more.
+  const internal = new Set(['_id', '__v', 'email', 'password', 'userSnapshot', 'authorSnapshot', 'resourceSnapshot', 'bySnapshot',
+    'reminderSentAt', 'requestNotifiedAt', 'alertCheckAt', 'deleting', 'answersTotal', 'hiddenBy', 'gradedBy', 'calendarToken', 'source']);
+  const leaks = new Set<string>();
+  const walk = (value: unknown, where: string, entry: Answer) => {
+    if (Array.isArray(value)) value.forEach((item, i) => walk(item, `${where}[${i}]`, entry));
+    else if (value && typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) {
+        if (where === '$' && entry.isError && key === 'details') continue; // keyed by field name
+        if (internal.has(key)) leaks.add(`${entry.label}: key ${where}.${key}`);
+        walk(item, `${where}.${key}`, entry);
+      }
+    }
+  };
+  for (const entry of answers) {
+    walk(JSON.parse(entry.text), '$', entry);
+    if (/[a-z0-9._+-]+@campuslink\.test/i.test(entry.text)) leaks.add(`${entry.label}: an email address`);
+  }
+  expect(answers.length).toBeGreaterThan(100);
   expect([...leaks]).toEqual([]);
 });
