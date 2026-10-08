@@ -70,6 +70,8 @@ const AUDIT_ACTIONS = [
   "alumni.erase",
   "alumni.post.delete",
   "alumni.post.hide",
+  "alumni.post.unhide",
+  "marketplace.review.delete",
 ] as const;
 
 /** Action codes with a readable label (`admin.audit.actionLabels.<code>`); other codes are shown as they are. */

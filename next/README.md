@@ -384,3 +384,11 @@ Each phase 2 module documents itself (see also docs/phase2-contract.md):
 - [Bookings (module 5)](docs/bookings.md)
 - [Forum (module 4)](docs/forum.md)
 - [Attendance, grades and analytics (module 9)](docs/analytics.md)
+
+## Phase 3 modules
+
+See also docs/phase3-contract.md:
+
+- [Carpooling and the real-time layer (module 2)](docs/carpool.md)
+- [Notes marketplace (module 3)](docs/marketplace.md)
+- [Alumni network (module 6)](docs/alumni.md)

@@ -207,14 +207,18 @@
       "marketplace": {
         "approve": "Document approved",
         "reject": "Document rejected",
-        "unpublish": "Document unpublished"
+        "unpublish": "Document unpublished",
+        "review": {
+          "delete": "Marketplace review deleted"
+        }
       },
       "alumni": {
         "export": "Alumni data exported",
         "erase": "Alumni data erased",
         "post": {
           "delete": "Alumni post deleted",
-          "hide": "Alumni post hidden"
+          "hide": "Alumni post hidden",
+          "unhide": "Alumni post shown again"
         }
       }
     },

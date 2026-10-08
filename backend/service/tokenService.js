@@ -31,7 +31,10 @@ const signAccessToken = (user, sessionId = null) =>
 // Throws HttpError(401) with code TOKEN_EXPIRED when the client should call /api/auth/refresh.
 const verifyAccessToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+    // Access tokens carry no audience: refuse any audience-scoped JWT (e.g. a real-time ticket).
+    if (payload.aud !== undefined) throw new Error('audience-scoped token');
+    return payload;
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       throw new HttpError(401, 'TOKEN_EXPIRED', 'Access token expired');
@@ -105,20 +108,27 @@ const rotateRefreshToken = async (refreshToken, req) => {
   };
 };
 
-// Ends one session (logout): deletes its refresh token and the push subscriptions it registered.
-// Resolves to the deleted session document, or null when the token is unknown.
+// Closes the real-time (Socket.IO) connections of ended sessions: every one of the user's, or with
+// { sessionId } only those of that session. Loaded lazily; a no-op without a Socket.IO server (scripts).
+// Never throws.
+const closeRealtimeConnections = (userId, options) => require('./realtime').disconnectUser(userId, options);
+
+// Ends one session (logout): deletes its refresh token and the push subscriptions it registered, and closes
+// the real-time connections it opened. Resolves to the deleted session document, or null when the token is unknown.
 const revokeRefreshToken = async (refreshToken) => {
   const stored = await RefreshToken.findOneAndDelete({ tokenHash: hashToken(refreshToken) });
   if (stored?.sessionId) {
     await PushSubscription.deleteMany({ user: stored.user, sessionId: stored.sessionId });
+    await closeRealtimeConnections(stored.user, { sessionId: stored.sessionId });
   }
   return stored;
 };
 
-// Ends every session of a user (password change or reset, account deletion): refresh tokens and
-// every push subscription of the user.
+// Ends every session of a user (password change or reset, admin password change, account deletion):
+// refresh tokens, every push subscription and every real-time connection of the user.
 const revokeAllRefreshTokens = async (userId) => {
   await Promise.all([RefreshToken.deleteMany({ user: userId }), PushSubscription.deleteMany({ user: userId })]);
+  await closeRealtimeConnections(userId);
 };
 
 module.exports = {

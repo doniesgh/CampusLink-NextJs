@@ -15,6 +15,7 @@ const {
 const { idOf } = require('../utils/serialize');
 const { revokeAllRefreshTokens } = require('../service/tokenService');
 const auditService = require('../service/auditService');
+const realtime = require('../service/realtime');
 
 const { ROLES } = User;
 
@@ -243,11 +244,17 @@ const updateUser = async (req, res) => {
     (field) => user.isModified(field) && !(field === 'group' && idOf(user.group) === before.group)
   );
   const passwordChanged = user.isModified('password');
+  const roleChanged = user.isModified('role');
   await user.save();
   if (changes.group !== undefined) await user.populateGroup();
 
   if (passwordChanged) {
+    // Also closes every real-time connection of the user.
     await revokeAllRefreshTokens(user._id);
+  } else if (roleChanged) {
+    // Real-time connections were opened (and joined their rooms) under the old role: the clients reconnect
+    // with a new ticket or token and join again under the new one.
+    await realtime.disconnectUser(user._id);
   }
 
   if (changed.length > 0) {
@@ -298,13 +305,19 @@ const deleteUser = async (req, res) => {
   const user = await User.findOneAndDelete({ _id: found._id }).setOptions({ populateGroup: false });
   if (!user) throw userNotFound();
 
-  // Sessions, push subscriptions and in-app notifications of the account go with it.
+  // Sessions, push subscriptions, real-time connections and in-app notifications of the account go with it.
   const { models } = mongoose;
   await Promise.all([
     revokeAllRefreshTokens(user._id),
     models.PushSubscription?.deleteMany({ user: user._id }),
     models.Notification?.deleteMany({ user: user._id }),
   ]);
+  // Every real-time connection of the account is closed (they leave every room). revokeAllRefreshTokens does it
+  // too: explicit here so an account deletion never depends on how sessions are revoked.
+  await realtime.disconnectUser(user._id);
+  // Right to be forgotten in the alumni network (any role: alumni profile and posts deleted, both sides of the
+  // mentoring history anonymized, same erasure as DELETE /api/alumni/me). Loaded lazily; never throws.
+  await require('../service/alumniService').purgeUser(user._id);
 
   await auditService.record(req, {
     action: 'user.delete',

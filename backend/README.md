@@ -59,8 +59,10 @@ scripts/               create-admin, generate-vapid, seed-demo (+ seed/*.js plug
   with a random `sessionId`. The access token carries it as the `sid` claim (`req.sessionId`). `POST /refresh`
   rewrites that document in place (new token hash and expiry, single-use as before), so the session keeps its
   `sessionId`; a session opened before session ids existed gets one on its next refresh. `POST /logout` deletes the
-  session and its push subscriptions. Password change/reset and admin password changes revoke every session and
-  push subscription of the user.
+  session, its push subscriptions and closes its real-time (Socket.IO) connections. Password change/reset, admin
+  password changes and account deletion revoke every session, push subscription and real-time connection of the
+  user (`tokenService.revokeAllRefreshTokens`); a role change closes the user's real-time connections too
+  (`realtime.disconnectUser`, see [`docs/carpool.md`](docs/carpool.md) section 1).
 - **Rate limits** (`middleware/rateLimit.js`, in memory, per instance): every limiter answers
   `429 TOO_MANY_REQUESTS` with a `Retry-After` header and `details.retryAfter` (seconds), and is skipped with
   `RATE_LIMIT_ENABLED=false`. The client IP is `req.ip` (`TRUST_PROXY`).
@@ -245,6 +247,8 @@ who still has SCHEDULED sessions that have not ended: `409 IN_USE`, `details.ref
 cancel them first; past and cancelled sessions do not block). Sessions are counted through
 `mongoose.models.ClassSession` (`subject`, `room`, `groups` fields) and announcements through
 `mongoose.models.Announcement` (`audience.programs`, `audience.groups`) when those models are registered.
+A deleted account loses its sessions, push subscriptions, real-time connections and in-app notifications, and its
+alumni network data is erased (`alumniService.purgeUser`: profile and posts deleted, mentoring history anonymized).
 
 ### Audit — `service/auditService.js`
 
@@ -447,3 +451,11 @@ Each phase 2 module documents itself (see also docs/phase2-contract.md):
 - [Bookings (module 5)](docs/bookings.md)
 - [Forum (module 4)](docs/forum.md)
 - [Attendance, grades and analytics (module 9)](docs/analytics.md)
+
+## Phase 3 modules
+
+See also docs/phase3-contract.md:
+
+- [Carpooling and the real-time layer (module 2)](docs/carpool.md)
+- [Notes marketplace (module 3)](docs/marketplace.md)
+- [Alumni network (module 6)](docs/alumni.md)
