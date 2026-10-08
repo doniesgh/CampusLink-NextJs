@@ -178,6 +178,9 @@ Variante sans serveur à administrer, sur les offres gratuites : le site sur **V
 3. **Vercel** : projet avec *Root Directory* = `next` (ou `vercel deploy` depuis le dossier `next/`), variables
    `API_URL` et `NEXT_PUBLIC_REALTIME_URL` = adresse Render, `NEXT_PUBLIC_APP_TIMEZONE=Africa/Tunis`,
    `TRUSTED_PROXY_HOPS=1`. `NEXT_PUBLIC_*` est lu au build : redéployer après un changement.
+   [`next/vercel.json`](../next/vercel.json) impose le framework Next.js et `npm ci` : sans lui, un projet créé en ligne de
+   commande est servi comme un site statique (toutes les pages en 404), et l'ancien `pnpm-lock.yaml` fait choisir pnpm
+   (exclu de l'envoi par `next/.vercelignore`).
 4. **Données** : depuis un poste, `MONGO_URI=<Atlas> STORAGE_DRIVER=gridfs npm run seed:demo` puis
    `npm run create-admin -- <email> <mot de passe>` (dans `backend/`).
 5. **Veille** : sans requête pendant 15 min, le service Render gratuit s'endort (premier appel ≈ 50 s). Un moniteur
@@ -185,6 +188,10 @@ Variante sans serveur à administrer, sur les offres gratuites : le site sur **V
    pour un service.
 
 Limites : 512 Mo pour les données et les fichiers, temps réel et tâches planifiées sur une seule instance.
+
+Version en ligne actuelle : site `https://campuslink-esprit.vercel.app`, API `https://campuslink-api-kn7w.onrender.com`
+(données de démonstration du 8 octobre 2026). Le SMTP n'y est pas encore configuré : le code de connexion par e-mail
+(2FA) et la réinitialisation du mot de passe ne fonctionnent pas en ligne ; ne pas y activer la 2FA sur un compte.
 
 ## 5. Sauvegarde et mise à jour
 

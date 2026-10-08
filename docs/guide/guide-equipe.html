@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>CampusLink — Guide de l'équipe</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm 20mm 18mm; }
+  :root { --indigo: #253C6D; --coral: #F2842F; --ink: #1F2937; --muted: #5b6474; --line: #d9dee7; --soft: #f3f4f6; --ok: #0a6b4f; --warn: #b45309; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI", Inter, Arial, sans-serif; color: var(--ink); font-size: 10.2pt; line-height: 1.5; margin: 0; }
+  h1, h2, h3, h4 { font-family: "Segoe UI Semibold", "Segoe UI", Arial, sans-serif; color: var(--indigo); line-height: 1.25; }
+  h1 { font-size: 21pt; margin: 0 0 10pt; padding-bottom: 6pt; border-bottom: 3px solid var(--coral); page-break-before: always; }
+  h2 { font-size: 13.5pt; margin: 18pt 0 6pt; }
+  h3 { font-size: 11.2pt; margin: 13pt 0 4pt; }
+  h4 { font-size: 10.4pt; margin: 10pt 0 3pt; color: var(--ink); }
+  p { margin: 0 0 6pt; }
+  ul, ol { margin: 0 0 7pt; padding-left: 16pt; }
+  li { margin: 1.5pt 0; }
+  code, .mono { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 8.8pt; background: var(--soft); padding: 0 3px; border-radius: 3px; }
+  pre { font-family: "Cascadia Mono", Consolas, "Courier New", monospace; font-size: 8.5pt; background: #0f1b33; color: #e8edf7; padding: 8pt 10pt; border-radius: 6px; white-space: pre-wrap; word-break: break-word; margin: 4pt 0 9pt; page-break-inside: avoid; line-height: 1.45; }
+  pre .c { color: #9fb3d9; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 10pt; font-size: 9pt; page-break-inside: auto; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  th { background: var(--indigo); color: #fff; text-align: left; padding: 4pt 6pt; font-weight: 600; }
+  td { border-bottom: 1px solid var(--line); padding: 4pt 6pt; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8f9fb; }
+  .pill { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 8pt; font-weight: 700; white-space: nowrap; }
+  .ok { background: #dff3ea; color: var(--ok); }
+  .part { background: #fdecd9; color: var(--warn); }
+  .no { background: #eef0f4; color: var(--muted); }
+  .note { border-left: 4px solid var(--coral); background: #fff6ee; padding: 6pt 9pt; margin: 6pt 0 10pt; border-radius: 0 6px 6px 0; page-break-inside: avoid; }
+  .info { border-left: 4px solid var(--indigo); background: #eef2fa; padding: 6pt 9pt; margin: 6pt 0 10pt; border-radius: 0 6px 6px 0; page-break-inside: avoid; }
+  .danger { border-left: 4px solid #b42318; background: #fdecec; padding: 6pt 9pt; margin: 6pt 0 10pt; border-radius: 0 6px 6px 0; page-break-inside: avoid; }
+  .note strong:first-child, .info strong:first-child, .danger strong:first-child { color: var(--indigo); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 7pt 9pt; page-break-inside: avoid; }
+  .card h4 { margin-top: 0; color: var(--indigo); }
+  .small { font-size: 8.6pt; color: var(--muted); }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover .band { background: var(--indigo); color: #fff; border-radius: 14px; padding: 34pt 30pt; }
+  .cover .band h1 { color: #fff; border: 0; font-size: 34pt; margin: 0; padding: 0; page-break-before: avoid; }
+  .cover .band p { font-size: 14pt; margin: 8pt 0 0; opacity: .92; }
+  .cover .badge { display: inline-block; margin-top: 18pt; background: var(--coral); color: var(--ink); font-weight: 700; padding: 5pt 14pt; border-radius: 999px; font-size: 11pt; }
+  .cover .meta td { border: 0; padding: 2pt 8pt 2pt 0; background: transparent !important; font-size: 10pt; }
+  .toc ol { list-style: none; padding: 0; columns: 1; }
+  .toc li { padding: 3pt 0; border-bottom: 1px dotted var(--line); font-size: 10.5pt; }
+  .toc li span { color: var(--coral); font-weight: 700; display: inline-block; width: 24pt; }
+  .toc ul { list-style: none; padding-left: 24pt; margin: 2pt 0 0; }
+  .toc ul li { border: 0; padding: 0; font-size: 9pt; color: var(--muted); }
+  .keep { page-break-inside: avoid; }
+</style>
+</head>
+<body>
+
+<!-- ============================== COUVERTURE ============================== -->
+<section class="cover">
+  <div>
+    <div class="band">
+      <h1>CampusLink</h1>
+      <p>Guide de l'équipe — état du projet, guide utilisateur et guide technique</p>
+      <span class="badge">Version du 8 octobre 2026 · branche main</span>
+    </div>
+    <p style="margin-top:22pt;font-size:11pt;max-width:150mm">
+      Plateforme collaborative pour la vie étudiante : une application web progressive (PWA) installable et
+      utilisable hors ligne, qui regroupe l'emploi du temps, les annonces, les réservations, le forum, le suivi
+      étudiant, le covoiturage, la marketplace de notes et le réseau alumni.
+    </p>
+  </div>
+  <table class="meta">
+    <tr><td><strong>Dépôt</strong></td><td>github.com/doniesgh/CampusLink-NextJs (branche <code>main</code>)</td></tr>
+    <tr><td><strong>Projet</strong></td><td>4e année — ESPRIT · d'après le cahier des charges CampusLink v1.0</td></tr>
+    <tr><td><strong>Public</strong></td><td>Membres de l'équipe (développement, tests, démonstration)</td></tr>
+    <tr><td><strong>Stack</strong></td><td>Next.js 16 · React 19 · Express 5 · MongoDB · Socket.IO · Playwright</td></tr>
+  </table>
+</section>
+
+<!-- ============================== SOMMAIRE ============================== -->
+<section class="toc">
+  <h1>Sommaire</h1>
+  <ol>
+    <li><span>1</span>Vue d'ensemble du projet</li>
+    <li><span>2</span>Modules implémentés</li>
+    <li><span>3</span>Ce qui n'est pas encore implémenté</li>
+    <li><span>4</span>Guide utilisateur
+      <ul><li>4.1 Premiers pas · 4.2 Étudiant · 4.3 Enseignant · 4.4 Administration · 4.5 Alumni · 4.6 Comptes de démonstration</li></ul></li>
+    <li><span>5</span>Faire tourner le projet (guide de l'équipe)
+      <ul><li>5.1 Prérequis · 5.2 Après un git pull · 5.3 Installation · 5.4 Variables · 5.5 Scripts et ports · 5.6 Mode production local</li></ul></li>
+    <li><span>6</span>Tests</li>
+    <li><span>7</span>Organisation du code et règles de travail</li>
+    <li><span>8</span>Déploiement gratuit (Vercel + Render + MongoDB Atlas)</li>
+    <li><span>9</span>Sécurité : ce que chacun doit savoir</li>
+    <li><span>10</span>Problèmes fréquents et solutions</li>
+    <li><span>11</span>Documentation de référence</li>
+  </ol>
+</section>
+
+<!-- ============================== 1. VUE D'ENSEMBLE ============================== -->
+<h1>1. Vue d'ensemble du projet</h1>
+<p>
+  CampusLink centralise les services numériques de la vie étudiante dans une seule application, installable sur
+  téléphone et ordinateur sans passer par un store, et consultable hors ligne pour l'essentiel (emploi du temps,
+  annonces). Une application mobile <strong>Flutter</strong> est prévue : elle utilisera la même API.
+</p>
+
+<h2>Architecture en bref</h2>
+<table>
+  <thead><tr><th style="width:24%">Partie</th><th>Rôle</th><th style="width:22%">Dossier</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Application web</strong></td><td>Next.js 16 (App Router), React 19, Tailwind CSS 4, next-intl (français / anglais). Pages serveur, Server Actions, relais <code>/bff</code> vers l'API, service worker (hors ligne, push).</td><td><code>next/</code></td></tr>
+    <tr><td><strong>API</strong></td><td>Express 5 + Mongoose 9 : routes REST <code>/api/*</code>, temps réel Socket.IO (chat), tâches planifiées, e-mails, push, PDF.</td><td><code>backend/</code></td></tr>
+    <tr><td><strong>Base de données</strong></td><td>MongoDB 7 (local, Docker ou MongoDB Atlas).</td><td>—</td></tr>
+    <tr><td><strong>Tests</strong></td><td>Playwright : tests d'API, tests de sécurité, tests navigateur.</td><td><code>tests/</code></td></tr>
+    <tr><td><strong>Documentation</strong></td><td>Architecture, déploiement, spécifications, contrats d'API, qualité, démos.</td><td><code>docs/</code></td></tr>
+  </tbody>
+</table>
+
+<div class="info"><strong>Principe clé.</strong> Le navigateur ne parle jamais directement à l'API REST : les jetons de
+session sont dans des cookies <code>httpOnly</code> gérés par Next.js, qui appelle l'API avec un jeton <code>Bearer</code>.
+Seul le chat temps réel se connecte directement à l'API, avec un ticket de 60 secondes. L'API ne dépend d'aucun
+cookie, ce qui la rend directement utilisable par l'application Flutter.</div>
+
+<h2>Rôles</h2>
+<table>
+  <thead><tr><th style="width:18%">Rôle</th><th>Ce qu'il peut faire</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Étudiant</strong></td><td>Emploi du temps de son groupe, annonces, notifications, réservations, forum, « Mon suivi » (présences, notes, bilan PDF), covoiturage, marketplace, demandes de mentorat.</td></tr>
+    <tr><td><strong>Enseignant</strong></td><td>Son emploi du temps, annonces vers ses groupes, appel, notes, réservations, forum (réponses certifiées), marketplace, réseau alumni.</td></tr>
+    <tr><td><strong>Administration</strong></td><td>Tout gérer : utilisateurs, structure académique, emploi du temps, annonces, ressources et réservations, modération (forum, marketplace, alumni), suivi des étudiants, journal d'audit.</td></tr>
+    <tr><td><strong>Alumni</strong></td><td>Annonces, forum, profil alumni (avec consentement), mentorat, fil d'actualités alumni.</td></tr>
+  </tbody>
+</table>
+<p class="small">L'inscription publique crée toujours un compte étudiant. Les autres rôles sont attribués par l'administration.</p>
+
+<!-- ============================== 2. MODULES IMPLÉMENTÉS ============================== -->
+<h1>2. Modules implémentés</h1>
+<p>Les dix modules du périmètre de base du cahier des charges sont en place (le module 10 partiellement).</p>
+
+<table>
+  <thead><tr><th style="width:5%">#</th><th style="width:21%">Module</th><th>Fonctionnalités livrées</th><th style="width:10%">État</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Emploi du temps intelligent</strong></td><td>Saisie par l'administration (séances, séries hebdomadaires) ou import CSV ; détection des conflits (salle, enseignant, groupe) ; vues jour / semaine / mois ; filtres matière et enseignant ; changements de salle ou d'horaire et annulations mis en évidence et notifiés (in-app + push) ; export iCal / Google Agenda ; consultable hors ligne.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>2</td><td><strong>Covoiturage étudiant</strong></td><td>Trajets vers ou depuis le campus ; recherche par quartier ou par position (rayon, date, sens) ; coût partagé suggéré ; demandes de place sans surréservation ; <strong>chat en temps réel</strong> entre conducteur et passagers acceptés ; notes après le trajet ; historique ; coordonnées précises visibles seulement par les participants.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>3</td><td><strong>Marketplace de notes</strong></td><td>Dépôt de documents (PDF, images, Word, PowerPoint) avec matière, niveau, professeur, année ; validation par l'administration ; signalements ; <strong>jetons fictifs</strong> (portefeuille, achats sans double débit) ; documents gratuits ou premium ; avis ; recherche et filtres.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>4</td><td><strong>Forum d'entraide</strong></td><td>Questions par matière, chapitre, niveau et étiquettes ; recherche plein texte et questions similaires ; votes ; réponse acceptée ; réponses certifiées des enseignants ; réputation et badges ; suivi et notifications ; réponses hors ligne ; modération.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>5</td><td><strong>Réservation de salles et de matériel</strong></td><td>Disponibilités par ressource ; salles libres ; conflits bloqués (y compris avec les cours) ; validation optionnelle ; rappel 60 min avant ; historique ; statistiques d'occupation ; gestion du matériel.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>6</td><td><strong>Annuaire et réseau alumni</strong></td><td>Profils avec consentement explicite (RGPD) ; annuaire filtrable ; demandes de mentorat (coordonnées partagées seulement après acceptation) ; fil d'actualités ; export et effacement des données.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>7</td><td><strong>Notifications et annonces</strong></td><td>Annonces avec priorité et pièces jointes ; ciblage par rôle, filière, niveau, groupe ; nombre de destinataires en direct ; publication immédiate ou programmée ; notification in-app + push ; statistiques de lecture.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>8</td><td><strong>Mode hors ligne (PWA)</strong></td><td>Application installable ; pages et données des modules essentiels gardées hors ligne ; actions hors ligne rejouées au retour du réseau ; bandeau « Tu es hors ligne » ; données effacées à la déconnexion (ordinateurs partagés).</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>9</td><td><strong>Tableau de bord étudiant</strong></td><td>Appel par l'enseignant ; taux d'absence et alertes (10 % / 20 %) ; évaluations et notes publiées ; moyennes pondérées ; graphiques de progression et d'activité ; comparaison anonymisée avec le groupe ; bilan PDF.</td><td><span class="pill ok">Fait</span></td></tr>
+    <tr><td>10</td><td><strong>Authentification et rôles</strong></td><td>Rôles et permissions par module ; jetons JWT + rafraîchissement ; validation en deux étapes par e-mail ; mot de passe oublié ; journal d'audit des actions sensibles.</td><td><span class="pill part">Partiel</span></td></tr>
+  </tbody>
+</table>
+
+<h2>Transversal</h2>
+<ul>
+  <li><strong>Langues</strong> : français (par défaut, tutoiement) et anglais, sélecteur dans le menu et sur la page de connexion.</li>
+  <li><strong>Sécurité</strong> : 53 tests de sécurité automatisés (autorisations, accès aux données d'autrui, concurrence, injections, fuites de données, limitation des tentatives, temps réel) ; en-têtes CSP et HSTS.</li>
+  <li><strong>Qualité</strong> : audit Lighthouse sur les pages principales — accessibilité 100, bonnes pratiques 100, performance 91 à 95, premier affichage en 0,8–0,9 s (4G simulée).</li>
+  <li><strong>Données de démonstration</strong> : une commande (<code>npm run seed:demo</code>) remplit tous les modules.</li>
+</ul>
+
+<!-- ============================== 3. PAS ENCORE IMPLÉMENTÉ ============================== -->
+<h1>3. Ce qui n'est pas encore implémenté</h1>
+
+<h2>Module 10 — à compléter</h2>
+<ul>
+  <li>Connexion unique de l'établissement (<strong>SSO</strong> via SAML / OAuth2) : le bouton « Continuer avec le compte de l'école » est affiché mais désactivé (« Bientôt »).</li>
+  <li>Connexion <strong>Google</strong> (OAuth).</li>
+</ul>
+
+<h2>Modules complémentaires 11 à 18 (phase suivante du cahier des charges)</h2>
+<table>
+  <thead><tr><th style="width:5%">#</th><th style="width:25%">Module</th><th>Contenu attendu</th><th style="width:14%">Complexité</th></tr></thead>
+  <tbody>
+    <tr><td>11</td><td>Gamification et badges</td><td>Points d'expérience sur toute la plateforme, badges thématiques, classement mensuel par filière. <em>Le forum a déjà une réputation et des badges.</em></td><td>Faible</td></tr>
+    <tr><td>12</td><td>Assistant virtuel / FAQ</td><td>Chatbot pour les questions administratives, base de connaissances alimentée par la scolarité, renvoi vers un humain.</td><td>Élevée</td></tr>
+    <tr><td>13</td><td>Espace bien-être</td><td>Rendez-vous avec le service d'accompagnement, ressources, contact confidentiel ; données sensibles (chiffrement, RGPD strict).</td><td>Moyenne à élevée</td></tr>
+    <tr><td>14</td><td>Sondages et votes</td><td>Sondages de l'administration ou des associations, vote unique vérifié, résultats en direct ou différés.</td><td>Faible</td></tr>
+    <tr><td>15</td><td>Stages et opportunités</td><td>Offres des entreprises et alumni, dépôt de CV, candidature, mise en relation avec les alumni. <em>Le fil alumni a déjà un type « opportunité ».</em></td><td>Moyenne</td></tr>
+    <tr><td>16</td><td>Bibliothèque numérique</td><td>Supports officiels des enseignants, annales corrigées, droits de diffusion.</td><td>Moyenne</td></tr>
+    <tr><td>17</td><td>Clubs et événements</td><td>Fiches clubs, calendrier des événements, inscriptions et places, rappels.</td><td>Moyenne</td></tr>
+    <tr><td>18</td><td>Objets trouvés et signalements</td><td>Annonces objet perdu / trouvé avec photo, signalement d'incident de sécurité avec suivi.</td><td>Faible</td></tr>
+  </tbody>
+</table>
+
+<h2>Autres travaux restants</h2>
+<table>
+  <thead><tr><th style="width:30%">Sujet</th><th>Détail</th></tr></thead>
+  <tbody>
+    <tr><td>Application mobile Flutter</td><td>Non commencée. L'API est prête (jetons en JSON, codes d'erreur stables, temps réel avec le jeton d'accès).</td></tr>
+    <tr><td>Push vers mobile (FCM)</td><td>Les abonnements FCM sont acceptés et stockés, mais l'envoi n'est pas implémenté.</td></tr>
+    <tr><td>E-mails de la version en ligne</td><td>Le site est en ligne (section 8), mais le SMTP n'y est pas configuré : la connexion avec code par e-mail (2FA) et la réinitialisation du mot de passe ne fonctionnent pas encore en ligne (<strong>ne pas activer la 2FA sur un compte en ligne</strong> : il ne pourrait plus se connecter). Ajouter <code>SMTP_USER</code>, <code>SMTP_PASS</code> et <code>SMTP_FROM</code> sur Render.</td></tr>
+    <tr><td>Livrables du cahier des charges</td><td>Spécifications fonctionnelles des modules 2, 3 et 6 ; maquettes UI/UX ; tests fonctionnels des phases 2 et 3 (seuls les tests de sécurité existent) ; vidéos de démonstration des phases 2 et 3.</td></tr>
+    <tr><td>Petites limites connues</td><td>Pas de formulaire web pour modifier un trajet (annuler puis reproposer) ; annulation d'un trajet par l'administration seulement via l'API ; chat temps réel sur une seule instance de serveur ; stockage objet S3 et file de messages (RabbitMQ / BullMQ) remplacés par des solutions plus simples.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================== 4. GUIDE UTILISATEUR ============================== -->
+<h1>4. Guide utilisateur</h1>
+
+<h2>4.1 Premiers pas (tous les rôles)</h2>
+<div class="two">
+  <div class="card"><h4>Se connecter</h4>
+    <p>Ouvrir le site, puis <strong>Se connecter</strong> avec son e-mail et son mot de passe. Cocher « Rester connecté »
+    pour une session de 30 jours. Si la validation en deux étapes est activée, saisir le code à 6 chiffres reçu par e-mail.</p>
+    <p class="small">Mot de passe oublié : lien sur la page de connexion, puis lien reçu par e-mail (valable 30 min).</p></div>
+  <div class="card"><h4>Langue</h4>
+    <p>Sélecteur <strong>Langue</strong> en bas du menu (ou sur la page de connexion) : Français / English. Le choix est
+    enregistré sur le compte et utilisé pour les e-mails, les notifications et le bilan PDF.</p></div>
+  <div class="card"><h4>Mon compte</h4>
+    <p>Menu <strong>Compte</strong> : prénom et nom, langue, <strong>validation en deux étapes</strong>, changement de mot de passe,
+    <strong>notifications push</strong> sur cet appareil (« Activer les notifications push »).</p></div>
+  <div class="card"><h4>Installer l'application</h4>
+    <p>Sur un site en HTTPS, le navigateur propose « Installer » (Chrome / Edge : icône dans la barre d'adresse ;
+    Android : « Ajouter à l'écran d'accueil » ; iPhone : Partager → « Sur l'écran d'accueil »).</p></div>
+  <div class="card"><h4>Hors ligne</h4>
+    <p>Les pages déjà consultées (accueil, emploi du temps, annonces, notifications, forum, réservations, suivi)
+    restent lisibles sans réseau. Un bandeau « Tu es hors ligne » s'affiche ; les actions faites hors ligne
+    (annonce lue, réponse au forum) sont envoyées au retour du réseau.</p></div>
+  <div class="card"><h4>Notifications</h4>
+    <p>La cloche du menu indique les notifications non lues : changements d'emploi du temps, annonces,
+    réservations, forum, présences, notes, covoiturage, marketplace, mentorat. <strong>Tout marquer comme lu</strong>
+    depuis la page Notifications.</p></div>
+</div>
+
+<h2>4.2 Étudiant</h2>
+<table>
+  <thead><tr><th style="width:22%">Menu</th><th>Ce que tu peux faire</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Accueil</strong></td><td>Tes cours du jour, les dernières annonces et tes notifications non lues.</td></tr>
+    <tr><td><strong>Emploi du temps</strong></td><td>Vues <em>Jour</em>, <em>Semaine</em>, <em>Mois</em> ; navigation Précédent / Aujourd'hui / Suivant ; filtres <em>Matière</em> et <em>Enseignant</em>. Les changements apparaissent en évidence (« Déplacé depuis C201 », « Annulé »). <strong>Exporter</strong> : copier le lien du calendrier, télécharger le .ics ou ajouter à Google Agenda.</td></tr>
+    <tr><td><strong>Annonces</strong></td><td>Fil des annonces qui te concernent (priorité Urgente / Importante / Normale / Faible, « Nouveau » si non lue), filtre « Non lues seulement », pièces jointes téléchargeables.</td></tr>
+    <tr><td><strong>Réservations</strong></td><td>Choisir une salle ou du matériel, voir ses disponibilités, trouver les salles libres sur un créneau, réserver (15 min de grille, 7 h–21 h, 3 h max, 3 réservations à venir max), annuler. Certaines ressources (amphis…) demandent une validation.</td></tr>
+    <tr><td><strong>Forum</strong></td><td>Rechercher, filtrer (matière, niveau, étiquette, sans réponse), poser une question (des questions similaires sont proposées), répondre, voter, accepter une réponse à ta question, suivre une question, signaler. Ta réputation et tes badges sont sur ton profil du forum.</td></tr>
+    <tr><td><strong>Mon suivi</strong></td><td>Taux de présence et alertes par matière, moyennes et notes publiées, graphique de progression, activité ; « Me comparer à mon groupe » (anonyme) ; <strong>Télécharger mon relevé (PDF)</strong>.</td></tr>
+    <tr><td><strong>Covoiturage</strong></td><td><em>Trouver un trajet</em> (quartier ou « Utiliser ma position », rayon, date, sens), demander une place ; <em>Proposer un trajet</em> (le coût partagé est suggéré) ; <em>Mes trajets</em>. Sur un trajet accepté : <strong>chat en direct</strong> avec le conducteur et les passagers, puis note après le trajet.</td></tr>
+    <tr><td><strong>Marketplace</strong></td><td>Parcourir et filtrer les documents, télécharger les gratuits, acheter les premium avec tes jetons (100 jetons de départ), déposer tes propres notes (validées par l'administration), laisser un avis, voir ton portefeuille.</td></tr>
+    <tr><td><strong>Réseau alumni</strong></td><td>Annuaire des diplômés (filière, promotion, secteur, « mentorat disponible »), fil d'actualités, <strong>demande de mentorat</strong> (3 en attente max) — l'e-mail de l'alumni n'est partagé qu'après acceptation.</td></tr>
+  </tbody>
+</table>
+
+<h2>4.3 Enseignant</h2>
+<table>
+  <thead><tr><th style="width:26%">Menu</th><th>Ce que vous pouvez faire</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Emploi du temps</strong></td><td>Les séances que vous assurez, avec les mêmes vues, filtres et exports que les étudiants.</td></tr>
+    <tr><td><strong>Gestion des annonces</strong></td><td><strong>Nouvelle annonce</strong> : titre, message, priorité, destinataires (uniquement les groupes où vous enseignez cette année, nombre de destinataires affiché), pièces jointes, publication immédiate ou programmée. Statistiques de lecture.</td></tr>
+    <tr><td><strong>Présences</strong></td><td>Faire l'appel d'une séance (de 15 min avant à 7 jours après) : Présent / Absent / En retard, « Tous présents ». Les absences non excusées alimentent les alertes des étudiants.</td></tr>
+    <tr><td><strong>Notes</strong></td><td>Créer une évaluation (type, date, barème, coefficient) pour une matière et un groupe que vous enseignez, saisir les notes, <strong>publier</strong> (les étudiants sont notifiés). Une évaluation publiée ne peut être supprimée que par l'administration.</td></tr>
+    <tr><td><strong>Réservations, forum, marketplace, réseau alumni</strong></td><td>Comme les étudiants ; au forum, vos réponses portent le badge « certifiée » ; réservations jusqu'à 8 h.</td></tr>
+  </tbody>
+</table>
+
+<h2>4.4 Administration</h2>
+<table>
+  <thead><tr><th style="width:28%">Menu Administration</th><th>Ce que vous pouvez faire</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Utilisateurs</strong></td><td>Rechercher, filtrer par rôle, <strong>Ajouter un utilisateur</strong> (rôle, groupe pour un étudiant), modifier, supprimer.</td></tr>
+    <tr><td><strong>Structure académique</strong></td><td>Onglets Filières, Groupes, Matières, Salles (réservable, validation requise). Un élément encore utilisé ne peut pas être supprimé.</td></tr>
+    <tr><td><strong>Gestion de l'emploi du temps</strong></td><td>Afficher par groupe, enseignant ou salle ; <strong>Ajouter une séance</strong> (option « Répéter chaque semaine ») ; cliquer une séance pour la modifier, l'annuler (étudiants notifiés) ou la supprimer ; <strong>Importer un CSV</strong> (« Vérifier le fichier » puis « Importer »). Les conflits sont refusés avec le détail.</td></tr>
+    <tr><td><strong>Gestion des annonces</strong></td><td>Toutes les annonces, ciblage libre (rôles, filières, niveaux, groupes), brouillons, programmation, statistiques.</td></tr>
+    <tr><td><strong>Réservations et ressources</strong></td><td>Demandes à valider (accepter / refuser avec note), toutes les réservations, matériel, statistiques d'occupation.</td></tr>
+    <tr><td><strong>Modération du forum</strong></td><td>Signalements, masquer / réafficher un contenu, traiter un signalement.</td></tr>
+    <tr><td><strong>Modération marketplace</strong></td><td>Documents à valider (accepter / refuser avec motif), signalements, documents retirés.</td></tr>
+    <tr><td><strong>Suivi des étudiants</strong></td><td>Alertes d'absentéisme, vue par groupe, fiche d'un étudiant et son bilan PDF ; « Excusé » sur les absences justifiées.</td></tr>
+    <tr><td><strong>Présences, Notes</strong></td><td>Comme un enseignant, pour toutes les séances et tous les groupes.</td></tr>
+    <tr><td><strong>Journal d'audit</strong></td><td>Qui a fait quoi et quand (création de comptes, changements de rôle, séances, annonces, décisions, modération…), filtrable par action.</td></tr>
+  </tbody>
+</table>
+<div class="keep">
+<h4>Format du fichier CSV d'emploi du temps</h4>
+<pre>date,start,end,subject_code,teacher_email,groups,room,type,notes
+2026-10-12,08:30,10:00,BDD,amira.bensalah@campuslink.local,4TWIN1|4TWIN2,A04,LECTURE,
+2026-10-12,10:15,11:45,WEB,karim.trabelsi@campuslink.local,4TWIN1,C201,LAB,Apporter son PC</pre>
+<p class="small">Séparateur virgule ou point-virgule, UTF-8, heures du campus, groupes séparés par « | », types LECTURE, TUTORIAL, LAB, EXAM, OTHER. Tout ou rien : une ligne invalide ou en conflit bloque l'import (le rapport indique le numéro de ligne).</p>
+</div>
+
+<h2>4.5 Alumni</h2>
+<ul>
+  <li><strong>Mon profil alumni</strong> : parcours, entreprise, poste, secteur, compétences, disponibilité pour le mentorat. Le profil reste <strong>privé</strong> tant que vous n'avez pas donné votre consentement explicite à sa visibilité sur le campus.</li>
+  <li><strong>Mentorat</strong> : accepter ou refuser les demandes des étudiants (avec un message) ; votre e-mail n'est partagé qu'après acceptation.</li>
+  <li><strong>Fil d'actualités</strong> : partager un nouveau poste, une réussite, une opportunité, un événement.</li>
+  <li><strong>Mes données</strong> : « Télécharger mes données » (export RGPD) ou les supprimer définitivement.</li>
+</ul>
+
+<h2>4.6 Comptes de démonstration</h2>
+<p>Créés par <code>npm run seed:demo</code>. <strong>Mot de passe commun : <code>Campus123!</code></strong> (à ne jamais utiliser en production).</p>
+<table>
+  <thead><tr><th style="width:16%">Rôle</th><th>Comptes (e-mail)</th></tr></thead>
+  <tbody>
+    <tr><td>Administration</td><td><code>admin@campuslink.local</code></td></tr>
+    <tr><td>Enseignants</td><td><code>amira.bensalah@…</code> (Bases de données), <code>karim.trabelsi@…</code> (Développement web), <code>leila.gharbi@…</code>, <code>mehdi.jaziri@…</code></td></tr>
+    <tr><td>Étudiants 4TWIN1</td><td><code>yasmine.haddad@…</code> (alerte d'absence en WEB), <code>sarra.mansouri@…</code> (alerte critique en BDD), <code>omar.ferchichi@…</code> (interface en anglais), <code>mariem.jlassi@…</code>, <code>aziz.benamor@…</code></td></tr>
+    <tr><td>Autres groupes</td><td>4TWIN2 : <code>ahmed.karray@…</code>, <code>nour.chaabane@…</code>, <code>rami.belhaj@…</code> · 4DS1 : <code>ines.zouari@…</code>, <code>youssef.hammami@…</code>, <code>malek.ayari@…</code> · 4SAE1 : <code>aya.khelifi@…</code>, <code>hamza.dridi@…</code>, <code>lina.bouazizi@…</code> · sans groupe : <code>skander.mejri@…</code></td></tr>
+    <tr><td>Alumni</td><td><code>selim.rekik@…</code>, <code>bilel.saidi@…</code>, <code>emna.chebbi@…</code>, <code>firas.guesmi@…</code>, <code>hela.tlili@…</code>, <code>mouna.kacem@…</code>, <code>rania.gharsalli@…</code>, <code>walid.mejdoub@…</code></td></tr>
+  </tbody>
+</table>
+<p class="small">« @… » = <code>@campuslink.local</code>. Les données (emploi du temps de la semaine, annonces, réservations, forum, notes, trajets, documents, alumni) sont générées autour de la date du jour.</p>
+
+<!-- ============================== 5. FAIRE TOURNER LE PROJET ============================== -->
+<h1>5. Faire tourner le projet</h1>
+
+<h2>5.1 Prérequis</h2>
+<table>
+  <thead><tr><th style="width:24%">Outil</th><th style="width:20%">Version</th><th>Remarque</th></tr></thead>
+  <tbody>
+    <tr><td>Node.js</td><td>20 ou plus (testé : 22)</td><td>Inclut npm. <strong>Utiliser npm</strong> (pas pnpm).</td></tr>
+    <tr><td>MongoDB</td><td>7 ou plus</td><td>Service local, conteneur Docker ou MongoDB Atlas.</td></tr>
+    <tr><td>Git</td><td>récent</td><td>—</td></tr>
+    <tr><td>Docker Desktop</td><td>facultatif</td><td>Le plus simple pour lancer MongoDB.</td></tr>
+    <tr><td>Navigateur</td><td>Chrome / Edge / Firefox récents</td><td>Pour la PWA et le hors ligne en production.</td></tr>
+  </tbody>
+</table>
+
+<h2>5.2 À faire après le premier <code>git pull</code> de cette version</h2>
+<div class="danger"><strong>Important.</strong> <code>backend/.env</code> n'est plus suivi par git (il contenait des secrets).
+<strong>Sauvegardez votre <code>backend/.env</code> avant de faire <code>git pull</code></strong> : git le supprime de votre dossier.
+Recréez-le ensuite à partir de <code>backend/.env.example</code>. L'ancienne variable <code>SECRET</code> n'est plus lue :
+<code>JWT_SECRET</code> est obligatoire.</div>
+<ol>
+  <li>Sauvegarder <code>backend/.env</code>, puis <code>git pull</code> sur <code>main</code>.</li>
+  <li><code>npm install</code> dans <code>backend/</code>, <code>next/</code> et <code>tests/</code> (nouvelles dépendances).</li>
+  <li>Recréer <code>backend/.env</code> depuis <code>backend/.env.example</code> (étape 5.3).</li>
+  <li>Remplir la base : <code>npm run seed:demo</code>, puis créer son compte administrateur.</li>
+</ol>
+
+<h2>5.3 Installation pas à pas</h2>
+<h4>1. Récupérer le code et lancer MongoDB</h4>
+<pre>git clone https://github.com/doniesgh/CampusLink-NextJs.git
+cd CampusLink-NextJs
+<span class="c"># MongoDB dans Docker (si vous n'avez pas de service MongoDB local)</span>
+docker run -d --name campuslink-mongo -p 27017:27017 -v campuslink-data:/data/db mongo:7</pre>
+
+<h4>2. API (backend)</h4>
+<pre>cd backend
+npm install
+cp .env.example .env                  <span class="c"># Windows PowerShell : Copy-Item .env.example .env</span>
+<span class="c"># Générer un secret et le coller dans JWT_SECRET= (fichier .env)</span>
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+npm run generate-vapid                <span class="c"># copier les deux clés dans VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY</span>
+npm run seed:demo                     <span class="c"># données de démonstration (facultatif)</span>
+npm run create-admin -- votre.email@esprit.tn MotDePasseSolide Prénom Nom
+npm run dev                           <span class="c"># API sur http://localhost:4000 (redémarre à chaque modification)</span></pre>
+
+<h4>3. Application web (autre terminal)</h4>
+<pre>cd next
+npm install
+cp .env.example .env.local            <span class="c"># API_URL=http://localhost:4000 par défaut</span>
+npm run dev                           <span class="c"># site sur http://localhost:3000</span></pre>
+<div class="info"><strong>E-mails en local.</strong> Sans <code>SMTP_USER</code> / <code>SMTP_PASS</code>, les e-mails (code de connexion,
+lien de réinitialisation) ne sont pas envoyés : ils s'affichent dans la console de l'API. Pour un vrai envoi, utiliser un
+mot de passe d'application Gmail.</div>
+
+<h2>5.4 Variables d'environnement essentielles</h2>
+<table>
+  <thead><tr><th style="width:30%">Variable</th><th style="width:10%">Où</th><th>Rôle</th></tr></thead>
+  <tbody>
+    <tr><td><code>MONGO_URI</code></td><td>API</td><td>Connexion MongoDB (obligatoire), ex. <code>mongodb://localhost:27017/campuslink</code></td></tr>
+    <tr><td><code>JWT_SECRET</code></td><td>API</td><td>Secret de signature des jetons (obligatoire, 64 octets aléatoires)</td></tr>
+    <tr><td><code>CORS_ORIGINS</code>, <code>APP_URL</code></td><td>API</td><td>Adresse du site (CORS, liens des e-mails) — <code>http://localhost:3000</code> en local</td></tr>
+    <tr><td><code>PUBLIC_API_URL</code></td><td>API</td><td>Adresse publique de l'API (liens iCal) — <code>http://localhost:4000</code></td></tr>
+    <tr><td><code>VAPID_PUBLIC_KEY</code>, <code>VAPID_PRIVATE_KEY</code></td><td>API</td><td>Notifications push (<code>npm run generate-vapid</code>)</td></tr>
+    <tr><td><code>SMTP_*</code></td><td>API</td><td>Envoi réel des e-mails (facultatif en local)</td></tr>
+    <tr><td><code>RATE_LIMIT_ENABLED</code></td><td>API</td><td><code>false</code> pour désactiver la limitation des tentatives pendant le développement</td></tr>
+    <tr><td><code>STORAGE_DIR</code> / <code>STORAGE_DRIVER</code></td><td>API</td><td>Fichiers envoyés : sur disque (<code>disk</code>) ou dans MongoDB (<code>gridfs</code>, hébergement sans disque)</td></tr>
+    <tr><td><code>API_URL</code></td><td>Web</td><td>Adresse de l'API vue par le serveur Next.js</td></tr>
+    <tr><td><code>NEXT_PUBLIC_REALTIME_URL</code></td><td>Web</td><td>Adresse de l'API pour le chat temps réel (lue au <strong>build</strong>)</td></tr>
+    <tr><td><code>NEXT_PUBLIC_APP_TIMEZONE</code></td><td>Web</td><td>Fuseau du campus (<code>Africa/Tunis</code>)</td></tr>
+    <tr><td><code>COOKIE_SECURE</code></td><td>Web</td><td><code>false</code> seulement pour un build de production servi en http local</td></tr>
+  </tbody>
+</table>
+<p class="small">La liste complète et commentée est dans <code>backend/.env.example</code> et <code>next/.env.example</code>.</p>
+
+<h2>5.5 Scripts et ports</h2>
+<div class="two">
+<div>
+<table>
+  <thead><tr><th>Commande</th><th>Effet</th></tr></thead>
+  <tbody>
+    <tr><td colspan="2"><strong>backend/</strong></td></tr>
+    <tr><td><code>npm run dev</code></td><td>API avec rechargement (nodemon)</td></tr>
+    <tr><td><code>npm start</code></td><td>API (production)</td></tr>
+    <tr><td><code>npm run seed:demo</code></td><td>Données de démonstration</td></tr>
+    <tr><td><code>npm run create-admin -- e-mail mdp</code></td><td>Compte administrateur</td></tr>
+    <tr><td><code>npm run generate-vapid</code></td><td>Clés push</td></tr>
+    <tr><td colspan="2"><strong>next/</strong></td></tr>
+    <tr><td><code>npm run dev</code></td><td>Site en développement</td></tr>
+    <tr><td><code>npm run build</code> / <code>npm start</code></td><td>Build et serveur de production</td></tr>
+    <tr><td><code>npm run lint</code></td><td>ESLint</td></tr>
+    <tr><td colspan="2"><strong>tests/</strong></td></tr>
+    <tr><td><code>npm run test:api</code></td><td>Tests d'API et de sécurité</td></tr>
+    <tr><td><code>npm run test:e2e</code></td><td>Tests navigateur</td></tr>
+  </tbody>
+</table>
+</div>
+<div>
+<table>
+  <thead><tr><th>Port</th><th>Utilisé par</th></tr></thead>
+  <tbody>
+    <tr><td><code>3000</code></td><td>Site (Next.js)</td></tr>
+    <tr><td><code>4000</code></td><td>API + temps réel (Socket.IO)</td></tr>
+    <tr><td><code>27017</code></td><td>MongoDB</td></tr>
+    <tr><td><code>27018</code></td><td>Tests : MongoDB en mémoire</td></tr>
+    <tr><td><code>4100</code>, <code>4101</code></td><td>Tests : API (et API avec limitation)</td></tr>
+    <tr><td><code>3100</code></td><td>Tests : site</td></tr>
+  </tbody>
+</table>
+<div class="note"><strong>Next.js 16</strong> n'accepte qu'un seul <code>next dev</code> par dossier : arrêtez votre
+<code>npm run dev</code> avant les tests navigateur, ou lancez-les avec <code>E2E_NEXT_MODE=start</code>.</div>
+</div>
+</div>
+
+<h2>5.6 Mode production local (PWA, hors ligne, push)</h2>
+<p>Le service worker (hors ligne, notifications push) n'est actif qu'en build de production :</p>
+<pre>cd next
+npm run build
+COOKIE_SECURE=false npm start         <span class="c"># PowerShell : $env:COOKIE_SECURE="false"; npm start</span></pre>
+<p>Ensuite : DevTools → Application pour voir le service worker et le manifeste, DevTools → Network → <em>Offline</em> pour
+tester le hors ligne. L'installation de l'application et le push fonctionnent sur <code>localhost</code> ou en HTTPS.</p>
+
+<!-- ============================== 6. TESTS ============================== -->
+<h1>6. Tests</h1>
+<p>Les tests Playwright démarrent <strong>leur propre</strong> base MongoDB en mémoire, leur API et leur site sur des ports
+dédiés : ils ne touchent jamais à vos données locales.</p>
+<pre>cd tests
+npm install
+npx playwright install chromium       <span class="c"># une seule fois</span>
+npm run test:api                      <span class="c"># API + sécurité (≈ 2 min)</span>
+npm run test:e2e                      <span class="c"># navigateur (≈ 2 min)</span>
+npx playwright test --project=api api/security.spec.ts   <span class="c"># sécurité seulement</span>
+npm run report                        <span class="c"># rapport HTML du dernier passage</span></pre>
+<table>
+  <thead><tr><th style="width:26%">Ensemble</th><th style="width:12%">Tests</th><th>Contenu</th></tr></thead>
+  <tbody>
+    <tr><td>API</td><td>47</td><td>Authentification, sessions, comptes, profils, mots de passe, administration.</td></tr>
+    <tr><td>Sécurité (<code>security.spec.ts</code>)</td><td>53</td><td>Autorisations par rôle, accès aux données d'autrui, affectation de champs interdits, concurrence (réservations, places, portefeuille), fichiers, injections, fuites, limitation, temps réel, protections du site.</td></tr>
+    <tr><td>Navigateur (e2e)</td><td>22</td><td>Accueil, inscription, connexion, sessions, validation en deux étapes, mot de passe, hors ligne (confidentialité sur ordinateur partagé).</td></tr>
+  </tbody>
+</table>
+<p>Dernier passage complet sur un build de production : <strong>122 / 122 réussis</strong>.</p>
+
+<!-- ============================== 7. ORGANISATION ============================== -->
+<h1>7. Organisation du code et règles de travail</h1>
+<pre>backend/            API Express
+  app.js            démarrage, middlewares, routes, temps réel
+  models/ controllers/ routes/ service/ middleware/ utils/
+  scripts/          create-admin, generate-vapid, seed-demo (+ seed/10…80, un fichier par module)
+  docs/             documentation de chaque module (bookings, forum, analytics, carpool, marketplace, alumni)
+next/               application web
+  app/              pages : (front) accueil, (auth) connexion, (back)/dashboard/…, bff/, offline/
+  components/       interface : ui/ (composants communs), shell/ (menu), un dossier par module
+  lib/              logique : appels API, sessions, hors ligne, temps réel, un dossier par module
+  messages/fr|en/   textes traduits, un fichier par module
+  public/sw.js      service worker
+  proxy.ts          protection des pages, rafraîchissement des jetons, CSP
+tests/              Playwright (api/, e2e/, support/)
+docs/               architecture, déploiement, spécifications, contrats, qualité, démos, ce guide</pre>
+
+<h2>Règles à respecter</h2>
+<ul>
+  <li><strong>Contrats</strong> : chaque phase a un contrat (<code>docs/phase1|2|3-contract.md</code>) qui fixe les routes, les règles, les codes d'erreur et les écrans. Modifier le contrat avant de changer un comportement.</li>
+  <li><strong>Erreurs de l'API</strong> : toujours <code>{ error, code, details? }</code> avec un <code>code</code> stable (le web et Flutter s'appuient dessus).</li>
+  <li><strong>Textes</strong> : jamais de texte en dur dans l'interface ; ajouter la clé dans <code>messages/fr/…json</code> <strong>et</strong> <code>messages/en/…json</code> (vérifié par TypeScript). Français au tutoiement.</li>
+  <li><strong>Appels API côté web</strong> : par le serveur (<code>serverApi</code>, Server Actions) ou par le relais <code>/bff</code> ; jamais d'appel direct du navigateur vers l'API REST.</li>
+  <li><strong>Couleurs</strong> : utiliser les jetons du thème (<code>bg-primary</code>, <code>text-muted-foreground</code>…), jamais de couleur en dur (mode sombre).</li>
+  <li><strong>Avant de pousser</strong> : <code>npx tsc --noEmit</code> et <code>npm run lint</code> dans <code>next/</code>, <code>npm run test:api</code> dans <code>tests/</code>.</li>
+  <li><strong>Git</strong> : une branche par fonctionnalité, des commits courts et thématiques, une pull request vers <code>main</code>. Ne jamais committer <code>.env</code>.</li>
+</ul>
+
+<!-- ============================== 8. DÉPLOIEMENT ============================== -->
+<h1>8. Déploiement gratuit (Vercel + Render + MongoDB Atlas)</h1>
+<p>Configuration choisie pour une mise en ligne gratuite : le site sur <strong>Vercel</strong>, l'API sur <strong>Render</strong>,
+la base sur <strong>MongoDB Atlas</strong>. HTTPS est fourni par les deux hébergeurs (nécessaire pour la PWA et le push).</p>
+
+<h2>Étapes</h2>
+<ol>
+  <li><strong>MongoDB Atlas</strong> (atlas.mongodb.com) : créer un cluster gratuit M0, un utilisateur de base de données, autoriser l'accès réseau <code>0.0.0.0/0</code> (Render n'a pas d'IP fixe), copier la chaîne de connexion <code>mongodb+srv://…</code>.</li>
+  <li><strong>Render</strong> (render.com) : <em>New → Blueprint</em>, choisir le dépôt GitHub ; le fichier <code>render.yaml</code> du dépôt crée l'API (dossier <code>backend</code>, <code>node app.js</code>, contrôle de santé <code>/api/health</code>, fichiers stockés dans MongoDB). Renseigner <code>MONGO_URI</code>, les clés VAPID, l'adresse du site, et le SMTP si besoin.</li>
+  <li><strong>Vercel</strong> (vercel.com) : <em>Add New → Project</em>, importer le dépôt, <em>Root Directory</em> = <code>next</code>, variables <code>API_URL</code> et <code>NEXT_PUBLIC_REALTIME_URL</code> = adresse Render, <code>NEXT_PUBLIC_APP_TIMEZONE</code> = <code>Africa/Tunis</code>, <code>TRUSTED_PROXY_HOPS</code> = <code>1</code>. Le fichier <code>next/vercel.json</code> impose le framework Next.js et <code>npm ci</code> (sinon Vercel sert le dossier comme un site statique, ou choisit pnpm à cause de l'ancien <code>pnpm-lock.yaml</code>).</li>
+  <li>Reporter l'adresse Vercel dans <code>CORS_ORIGINS</code> et <code>APP_URL</code> sur Render.</li>
+  <li>Remplir la base en ligne depuis un poste de l'équipe : <code>MONGO_URI=&lt;Atlas&gt; STORAGE_DRIVER=gridfs npm run seed:demo</code>, puis <code>npm run create-admin</code>.</li>
+  <li>Garder l'API éveillée : un moniteur gratuit (ex. UptimeRobot) qui appelle <code>/api/health</code> toutes les 10 minutes.</li>
+</ol>
+<div class="note"><strong>Limites de l'offre gratuite.</strong> Sans requête pendant 15 minutes, l'API Render se met en veille
+(premier appel lent, ≈ 50 s) — d'où le moniteur. Atlas gratuit : 512 Mo (données + fichiers). Le chat et les tâches
+planifiées tournent sur une seule instance.</div>
+<h2>Version en ligne</h2>
+<table>
+  <thead><tr><th style="width:26%">Élément</th><th>Adresse / détail</th></tr></thead>
+  <tbody>
+    <tr><td>Site web (PWA)</td><td><code>https://campuslink-esprit.vercel.app</code></td></tr>
+    <tr><td>API (web et future app Flutter)</td><td><code>https://campuslink-api-kn7w.onrender.com</code> — santé : <code>/api/health</code></td></tr>
+    <tr><td>Base de données</td><td>MongoDB Atlas, cluster M0, base <code>campuslink</code> (fichiers envoyés dans GridFS)</td></tr>
+    <tr><td>Données</td><td>Données de démonstration du 8 octobre 2026 (emploi du temps sur 5 semaines à partir du 5 octobre) : mêmes comptes qu'en section 4.6, mot de passe <code>Campus123!</code>. Relancer le seed pour rafraîchir les dates.</td></tr>
+    <tr><td>Administrateur</td><td><code>raed.charrad@esprit.tn</code> (mot de passe communiqué séparément)</td></tr>
+    <tr><td>Vérifié en ligne</td><td>Connexion des 4 rôles, pages principales, téléchargement d'un document (GridFS), chat temps réel du covoiturage.</td></tr>
+  </tbody>
+</table>
+<p class="small">Procédure détaillée et variables : <code>docs/deploiement.md</code>. Les accès aux comptes Vercel, Render et Atlas sont gérés par Raed.</p>
+
+<!-- ============================== 9. SÉCURITÉ ============================== -->
+<h1>9. Sécurité : ce que chacun doit savoir</h1>
+<ul>
+  <li><strong>Secrets</strong> : <code>.env</code> et <code>.env.local</code> ne sont jamais commités. Les anciens <code>SECRET</code> et <code>FCM_SERVER_KEY</code> sont visibles dans l'historique git (commit <code>12a8462</code>) : ils doivent être considérés comme compromis et changés.</li>
+  <li><strong>Production</strong> : générer de nouveaux <code>JWT_SECRET</code> et clés VAPID ; ne jamais utiliser les comptes de démonstration (<code>Campus123!</code>).</li>
+  <li><strong>Mots de passe et codes</strong> : hachés (bcrypt / SHA-256) ; codes à usage unique et liens de réinitialisation limités dans le temps.</li>
+  <li><strong>Limitation des tentatives</strong> : active par défaut (connexion, codes, mots de passe, écritures des modules) ; <code>RATE_LIMIT_ENABLED=false</code> seulement en développement.</li>
+  <li><strong>Données personnelles</strong> : profils alumni privés sans consentement, e-mails partagés seulement après un mentorat accepté, coordonnées de covoiturage arrondies pour les non-participants, comparaison de notes à partir de 5 étudiants, données hors ligne effacées à la déconnexion.</li>
+  <li><strong>Journal d'audit</strong> : les actions sensibles sont tracées (consultable par l'administration).</li>
+  <li><strong>Avant chaque fusion</strong> : faire passer <code>tests/api/security.spec.ts</code>.</li>
+</ul>
+
+<!-- ============================== 10. PROBLÈMES FRÉQUENTS ============================== -->
+<h1>10. Problèmes fréquents et solutions</h1>
+<table>
+  <thead><tr><th style="width:36%">Symptôme</th><th>Solution</th></tr></thead>
+  <tbody>
+    <tr><td>L'API s'arrête : « Could not connect to MongoDB »</td><td>MongoDB ne tourne pas. Service Windows : <code>Start-Service MongoDB</code> (PowerShell administrateur) ; Docker : <code>docker start campuslink-mongo</code>. Vérifier <code>MONGO_URI</code>.</td></tr>
+    <tr><td>L'API refuse de démarrer : « Missing required environment variable »</td><td>Créer <code>backend/.env</code> depuis <code>.env.example</code> et remplir <code>MONGO_URI</code> et <code>JWT_SECRET</code>.</td></tr>
+    <tr><td>« Port 4000 / 3000 already in use »</td><td>Un serveur tourne déjà : le fermer, ou changer <code>PORT</code> (API) / <code>-p</code> (Next).</td></tr>
+    <tr><td>« Another next dev server is already running »</td><td>Next.js 16 : un seul <code>next dev</code> par dossier. Fermer l'autre terminal.</td></tr>
+    <tr><td><code>tsc</code> échoue dans <code>.next/dev/types</code></td><td>Fichiers générés périmés : supprimer <code>next/.next/dev</code> puis relancer.</td></tr>
+    <tr><td>« Impossible de joindre le serveur » sur le site</td><td>L'API n'est pas lancée ou <code>API_URL</code> est faux (<code>next/.env.local</code>).</td></tr>
+    <tr><td>Je ne reçois pas le code de connexion / le lien de réinitialisation</td><td>Sans SMTP, ils sont affichés dans la console de l'API.</td></tr>
+    <tr><td>Erreur 429 « Trop de tentatives » en développement</td><td>Attendre la fin de la fenêtre, ou <code>RATE_LIMIT_ENABLED=false</code> dans <code>backend/.env</code>.</td></tr>
+    <tr><td>Le hors ligne ou le push ne marchent pas</td><td>Le service worker n'existe qu'en build de production (section 5.6) ; le push demande aussi les clés VAPID et l'autorisation du navigateur.</td></tr>
+    <tr><td>Le chat du covoiturage ne se connecte pas</td><td><code>NEXT_PUBLIC_REALTIME_URL</code> doit pointer vers l'API <strong>au moment du build</strong> ; l'adresse du site doit être dans <code>CORS_ORIGINS</code>.</td></tr>
+    <tr><td>Erreur d'hydratation liée à <code>data-dav10</code> dans la console</td><td>Extension de navigateur (Office/WebDAV) : sans gravité, déjà neutralisée sur <code>&lt;html&gt;</code>.</td></tr>
+    <tr><td>Données de démonstration « dans le passé »</td><td>Relancer <code>npm run seed:demo</code> (idempotent) : les données sont recalées sur la date du jour.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================== 11. DOCUMENTATION ============================== -->
+<h1>11. Documentation de référence</h1>
+<table>
+  <thead><tr><th style="width:38%">Document</th><th>Contenu</th></tr></thead>
+  <tbody>
+    <tr><td><code>README.md</code></td><td>Présentation, démarrage rapide, liens</td></tr>
+    <tr><td><code>docs/architecture.md</code></td><td>Architecture, choix techniques, sécurité, modèle de données</td></tr>
+    <tr><td><code>docs/deploiement.md</code></td><td>Installation locale, production, nginx / HTTPS, sauvegarde</td></tr>
+    <tr><td><code>docs/specifications/</code></td><td>User stories et critères d'acceptation (modules 1, 4, 5, 7, 8, 9, 10)</td></tr>
+    <tr><td><code>docs/phase1|2|3-contract.md</code></td><td>Contrats techniques détaillés (API, règles, écrans), en anglais</td></tr>
+    <tr><td><code>backend/README.md</code>, <code>backend/docs/*.md</code></td><td>Services internes de l'API, documentation par module (dont la connexion temps réel pour Flutter)</td></tr>
+    <tr><td><code>next/README.md</code>, <code>next/docs/*.md</code></td><td>Conventions du site, hors ligne, BFF, documentation par module</td></tr>
+    <tr><td><code>tests/README.md</code></td><td>Lancer et comprendre les tests</td></tr>
+    <tr><td><code>docs/quality/</code></td><td>Rapports Lighthouse</td></tr>
+    <tr><td><code>docs/demo/</code></td><td>Vidéos de démonstration par rôle (phase 1)</td></tr>
+  </tbody>
+</table>
+<p class="small" style="margin-top:14pt">Ce guide est généré depuis <code>docs/guide/guide-equipe.html</code> (<code>node docs/guide/build-pdf.js</code>) : modifiez le HTML puis régénérez le PDF.</p>
+
+</body>
+</html>
