@@ -16,6 +16,9 @@
     "BOOKING": "Réservation",
     "FORUM": "Forum",
     "ATTENDANCE": "Présences",
-    "GRADE": "Notes"
+    "GRADE": "Notes",
+    "CARPOOL": "Covoiturage",
+    "MARKETPLACE": "Marketplace",
+    "MENTORING": "Mentorat"
   }
 }

@@ -25,6 +25,11 @@ const forumRoutes = require('./routes/forum');
 const attendanceRoutes = require('./routes/attendance');
 const gradeRoutes = require('./routes/grades');
 const analyticsRoutes = require('./routes/analytics');
+const carpoolRoutes = require('./routes/carpool');
+const marketplaceRoutes = require('./routes/marketplace');
+const alumniRoutes = require('./routes/alumni');
+const realtimeRoutes = require('./routes/realtime');
+const realtime = require('./service/realtime');
 
 const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
 
@@ -65,6 +70,10 @@ app.use('/api/forum', forumRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/grades', gradeRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/carpool', carpoolRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/alumni', alumniRoutes);
+app.use('/api/realtime', realtimeRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', code: 'NOT_FOUND' });
@@ -111,6 +120,8 @@ const start = async () => {
     }
     console.log(`CampusLink API listening on http://localhost:${port}`);
   });
+  // Real-time layer (Socket.IO) on the same HTTP server (phase 3 contract section 1).
+  realtime.init(server);
 
   let shuttingDown = false;
   const shutdown = () => {

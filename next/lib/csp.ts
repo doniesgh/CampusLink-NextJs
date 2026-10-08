@@ -19,10 +19,22 @@ export function createNonce(): string {
  *   Inline `style="…"` attributes stay allowed (`style-src-attr`): React renders some on the server (progress
  *   bars, subject colours, Radix positioning). `style-src` is the fallback of browsers without the CSP3
  *   -elem/-attr directives. In development Turbopack injects unnamed <style> tags: inline styles allowed.
- * - connections: this origin only; `next dev` also allows local WebSockets (development tools that run beside
+ * - connections: this origin and the real-time server (NEXT_PUBLIC_REALTIME_URL, http(s) + ws(s), phase 3 chat);
+ *   `next dev` also allows local WebSockets (development tools that run beside
  *   the dev server, e.g. React DevTools or editor extensions forwarding the browser console).
  * - workers and the manifest: this origin only (the service worker /sw.js has its own policy, next.config.ts).
  */
+/** Origins of the real-time server (Socket.IO): its http(s) origin and the matching ws(s) one. */
+function realtimeSources(): string {
+  try {
+    const url = new URL(process.env.NEXT_PUBLIC_REALTIME_URL || "http://localhost:4000");
+    const ws = url.protocol === "https:" ? "wss:" : "ws:";
+    return ` ${url.origin} ${ws}//${url.host}`;
+  } catch {
+    return "";
+  }
+}
+
 export function contentSecurityPolicy(nonce: string, dev = process.env.NODE_ENV === "development"): string {
   return [
     "default-src 'self'",
@@ -31,7 +43,7 @@ export function contentSecurityPolicy(nonce: string, dev = process.env.NODE_ENV 
     ...(dev ? [] : [`style-src-elem 'self' 'nonce-${nonce}'`, "style-src-attr 'unsafe-inline'"]),
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self'${dev ? " ws://localhost:* ws://127.0.0.1:*" : ""}`,
+    `connect-src 'self'${realtimeSources()}${dev ? " ws://localhost:* ws://127.0.0.1:*" : ""}`,
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",

@@ -62,6 +62,14 @@ const AUDIT_ACTIONS = [
   "grades.assessment.delete",
   "grades.publish",
   "grades.update",
+  "carpool.trip.cancel",
+  "marketplace.approve",
+  "marketplace.reject",
+  "marketplace.unpublish",
+  "alumni.export",
+  "alumni.erase",
+  "alumni.post.delete",
+  "alumni.post.hide",
 ] as const;
 
 /** Action codes with a readable label (`admin.audit.actionLabels.<code>`); other codes are shown as they are. */

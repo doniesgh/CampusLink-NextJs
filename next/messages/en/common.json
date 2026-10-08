@@ -59,7 +59,12 @@
     "grades": "Grades",
     "bookingsManagement": "Bookings & resources",
     "forumModeration": "Forum moderation",
-    "studentFollowUp": "Student follow-up"
+    "studentFollowUp": "Student follow-up",
+    "carpool": "Carpooling",
+    "marketplace": "Marketplace",
+    "alumni": "Alumni network",
+    "alumniProfile": "My alumni profile",
+    "marketplaceModeration": "Marketplace moderation"
   },
   "pagination": {
     "label": "Pagination",

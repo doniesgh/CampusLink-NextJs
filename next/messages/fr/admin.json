@@ -198,6 +198,24 @@
         },
         "publish": "Notes publiées",
         "update": "Notes modifiées"
+      },
+      "carpool": {
+        "trip": {
+          "cancel": "Trajet annulé"
+        }
+      },
+      "marketplace": {
+        "approve": "Document validé",
+        "reject": "Document refusé",
+        "unpublish": "Document retiré"
+      },
+      "alumni": {
+        "export": "Données alumni exportées",
+        "erase": "Données alumni effacées",
+        "post": {
+          "delete": "Publication alumni supprimée",
+          "hide": "Publication alumni masquée"
+        }
       }
     },
     "system": "Système",

@@ -12,6 +12,10 @@ export type NavLabelKey =
   | "analytics"
   | "attendance"
   | "grades"
+  | "carpool"
+  | "marketplace"
+  | "alumni"
+  | "alumniProfile"
   | "users"
   | "academic"
   | "timetableManagement"
@@ -19,6 +23,7 @@ export type NavLabelKey =
   | "bookingsManagement"
   | "forumModeration"
   | "studentFollowUp"
+  | "marketplaceModeration"
   | "audit";
 
 export type NavIconName = NavLabelKey;
@@ -43,6 +48,11 @@ const FORUM = item("forum", "/dashboard/forum");
 const ANALYTICS = item("analytics", "/dashboard/analytics");
 const ATTENDANCE = item("attendance", "/dashboard/attendance");
 const GRADES = item("grades", "/dashboard/grades");
+// Phase 3 modules (docs/phase3-contract.md section 5).
+const CARPOOL = item("carpool", "/dashboard/carpool");
+const MARKETPLACE = item("marketplace", "/dashboard/marketplace");
+const ALUMNI = item("alumni", "/dashboard/alumni");
+const ALUMNI_PROFILE = item("alumniProfile", "/dashboard/alumni/me");
 
 const ADMIN_NAV: NavItem[] = [
   item("users", "/dashboard/admin/users"),
@@ -52,21 +62,22 @@ const ADMIN_NAV: NavItem[] = [
   item("bookingsManagement", "/dashboard/admin/bookings"),
   item("forumModeration", "/dashboard/admin/forum"),
   item("studentFollowUp", "/dashboard/admin/analytics"),
+  item("marketplaceModeration", "/dashboard/admin/marketplace"),
   ATTENDANCE,
   GRADES,
   item("audit", "/dashboard/admin/audit"),
 ];
 
-/** Campus-life links per role (bookings, forum, personal progress). */
+/** Campus-life links per role (bookings, forum, progress, carpooling, marketplace, alumni network). */
 function campusItems(role: Role | undefined): NavItem[] {
   switch (role) {
     case "STUDENT":
-      return [BOOKINGS, FORUM, ANALYTICS];
+      return [BOOKINGS, FORUM, ANALYTICS, CARPOOL, MARKETPLACE, ALUMNI];
     case "TEACHER":
     case "ADMIN":
-      return [BOOKINGS, FORUM];
+      return [BOOKINGS, FORUM, MARKETPLACE, ALUMNI];
     case "ALUMNI":
-      return [FORUM];
+      return [FORUM, ALUMNI, ALUMNI_PROFILE];
     default:
       return [];
   }
@@ -95,5 +106,7 @@ export function navGroups(role: Role | undefined): NavGroup[] {
 /** "/dashboard" is only active on itself; other links also on their sub-pages. */
 export function isActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
+  // "My alumni profile" has its own link: do not also highlight "Alumni network" there.
+  if (href === "/dashboard/alumni" && (pathname === "/dashboard/alumni/me" || pathname.startsWith("/dashboard/alumni/me/"))) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }

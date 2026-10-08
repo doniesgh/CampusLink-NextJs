@@ -16,6 +16,9 @@
     "BOOKING": "Booking",
     "FORUM": "Forum",
     "ATTENDANCE": "Attendance",
-    "GRADE": "Grades"
+    "GRADE": "Grades",
+    "CARPOOL": "Carpooling",
+    "MARKETPLACE": "Marketplace",
+    "MENTORING": "Mentoring"
   }
 }
