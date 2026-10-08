@@ -61,3 +61,6 @@ tests/playwright-report/
 tests/blob-report/
 tests/playwright/.cache/
 tests/.tmp/
+
+# Local deployment secrets
+deploy/*.local.env

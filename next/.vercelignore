@@ -1,0 +1,8 @@
+# Files never uploaded by "vercel deploy" (the build runs on Vercel).
+.env
+.env.*
+!.env.example
+.next
+.next-*
+node_modules
+.vercel

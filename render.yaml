@@ -1,0 +1,52 @@
+# Render Blueprint for the CampusLink API (backend/), free plan.
+# Render dashboard: New > Blueprint > this repository. Values marked "sync: false" are asked when the
+# Blueprint is applied. See docs/deploiement.md, section "Déploiement gratuit".
+services:
+  - type: web
+    name: campuslink-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: node app.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI # MongoDB Atlas connection string (database "campuslink")
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_URL # public URL of the web app (Vercel)
+        sync: false
+      - key: CORS_ORIGINS # same as APP_URL
+        sync: false
+      - key: PUBLIC_API_URL # public URL of this service (https://<name>.onrender.com)
+        sync: false
+      - key: APP_TIMEZONE
+        value: Africa/Tunis
+      # No persistent disk on the free plan: uploaded files are stored in MongoDB (GridFS).
+      - key: STORAGE_DRIVER
+        value: gridfs
+      # Render's proxy is the only trusted hop: req.ip is the real client of direct API calls.
+      - key: TRUST_PROXY
+        value: "1"
+      # Every web user reaches the API through Vercel's servers: raise the shared per-IP auth limit.
+      - key: RATE_LIMIT_IP_MAX
+        value: "1000"
+      - key: VAPID_PUBLIC_KEY # npm run generate-vapid
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:admin@campuslink.local
+      # Optional: real e-mails (2FA codes, password reset). Without them, e-mail features fail in production.
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false

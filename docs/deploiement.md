@@ -162,6 +162,30 @@ Avec nginx devant l'API, passer `TRUST_PROXY=1` dans `backend/.env` pour que l'A
 - Activer les notifications push dans « Mon compte », puis modifier une salle depuis un compte administrateur :
   la notification arrive.
 
+## 4 bis. Déploiement gratuit : Vercel + Render + MongoDB Atlas
+
+Variante sans serveur à administrer, sur les offres gratuites : le site sur **Vercel**, l'API sur **Render**, la base sur
+**MongoDB Atlas** (cluster M0, 512 Mo). HTTPS est fourni par Vercel et Render.
+
+1. **Atlas** : cluster gratuit M0 (AWS, Francfort), utilisateur de base de données, *Network Access* = `0.0.0.0/0`
+   (Render n'a pas d'IP fixe), chaîne de connexion `mongodb+srv://…/campuslink?…`.
+2. **Render** : *New → Blueprint* sur ce dépôt. Le fichier [`render.yaml`](../render.yaml) crée le service
+   `campuslink-api` (dossier `backend`, `npm ci --omit=dev`, `node app.js`, contrôle `/api/health`, région Francfort).
+   Renseigner `MONGO_URI`, `APP_URL` et `CORS_ORIGINS` (adresse Vercel), `PUBLIC_API_URL` (adresse Render), les clés
+   VAPID (`npm run generate-vapid`) et, pour l'envoi d'e-mails, `SMTP_*`.
+   - Pas de disque persistant sur l'offre gratuite : **`STORAGE_DRIVER=gridfs`** range les fichiers envoyés dans MongoDB.
+   - `TRUST_PROXY=1` (proxy de Render) et `RATE_LIMIT_IP_MAX=1000` (tous les visiteurs du site arrivent par Vercel).
+3. **Vercel** : projet avec *Root Directory* = `next` (ou `vercel deploy` depuis le dossier `next/`), variables
+   `API_URL` et `NEXT_PUBLIC_REALTIME_URL` = adresse Render, `NEXT_PUBLIC_APP_TIMEZONE=Africa/Tunis`,
+   `TRUSTED_PROXY_HOPS=1`. `NEXT_PUBLIC_*` est lu au build : redéployer après un changement.
+4. **Données** : depuis un poste, `MONGO_URI=<Atlas> STORAGE_DRIVER=gridfs npm run seed:demo` puis
+   `npm run create-admin -- <email> <mot de passe>` (dans `backend/`).
+5. **Veille** : sans requête pendant 15 min, le service Render gratuit s'endort (premier appel ≈ 50 s). Un moniteur
+   gratuit (UptimeRobot, toutes les 5 à 10 min sur `/api/health`) le garde éveillé ; 750 h gratuites par mois suffisent
+   pour un service.
+
+Limites : 512 Mo pour les données et les fichiers, temps réel et tâches planifiées sur une seule instance.
+
 ## 5. Sauvegarde et mise à jour
 
 - Sauvegarde : `mongodump --uri "$MONGO_URI" --out /sauvegardes/$(date +%F)` et copie de `STORAGE_DIR`.
