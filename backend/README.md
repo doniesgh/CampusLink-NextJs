@@ -189,7 +189,7 @@ Code: `models/announcementModel.js`, `models/announcementReadModel.js`, `control
 - **Attachments**: up to 5 per announcement (multipart field `attachments`), each ≤ `MAX_UPLOAD_MB` (10): pdf, png,
   jpg/jpeg, webp, docx, xlsx, pptx, txt; MIME type, extension and content (magic bytes) must match. Errors:
   `413 FILE_TOO_LARGE`, `415 UNSUPPORTED_FILE_TYPE`, `400 TOO_MANY_FILES`. Files are saved through
-  `storageService` under `STORAGE_DIR/announcements/` and keep their original (UTF-8) name for downloads.
+  `storageService` (folder `announcements`, see "Files" below) and keep their original (UTF-8) name for downloads.
 - **Publication**: publishing (now, `POST /:id/publish` or the scheduler) is claimed atomically, snapshots
   `recipients`, records `announcement.publish` and notifies every recipient except the author (`ANNOUNCEMENT`,
   link `/dashboard/announcements/<id>`, title prefixed `[Urgent]` / `[Important]` for URGENT / HIGH, push urgency
@@ -359,8 +359,20 @@ await storageService.remove(key);                                  // idempotent
   and the content is checked (magic bytes; no NUL bytes in text files).
 - Errors: `413 FILE_TOO_LARGE`, `415 UNSUPPORTED_FILE_TYPE`, `400 TOO_MANY_FILES`, `400 VALIDATION_ERROR`
   (unexpected file field, malformed multipart).
-- Files live under `STORAGE_DIR` (default `backend/uploads`, git-ignored) with generated names; store the `key`
-  and the original `filename` in your model. Keys are validated (no path traversal).
+- Files are stored under generated keys (`<folder>/YYYY/MM/<32 hex>.<ext>`); store the `key` and the original
+  `filename` in your model. Keys are validated (`400 VALIDATION_ERROR`, no path traversal) and written once.
+- **Storage driver** (`STORAGE_DRIVER`, read at call time; same API, errors and keys for both):
+  - `disk` (default): files under `STORAGE_DIR` (default `backend/uploads`, git-ignored). For local development, a
+    VPS or any host with a persistent disk.
+  - `gridfs`: files in MongoDB, GridFS bucket `uploads` of the mongoose connection (`uploads.files` /
+    `uploads.chunks`), the key as the GridFS `filename`, `metadata: { mimeType, originalName }`. A unique index on
+    `filename` (fast lookups, a key is never written twice) and the chunks index are created on the first storage
+    call. For hosts without a persistent disk, such as the **Render free tier** (its disk is wiped on every
+    restart and redeploy, so disk files would be lost). Files count towards the database size: the MongoDB Atlas
+    free tier (M0) holds **512 MB** in all (data, files and indexes), i.e. at most about 50 files of the 10 MB
+    `MAX_UPLOAD_MB` limit, fewer with the rest of the data.
+  - Switching drivers does not move files: keys saved with one driver answer 404 with the other (run
+    `npm run seed:demo` again for the demo files).
 - `file.originalname` is UTF-8 (`defParamCharset: 'utf8'`): `filename="été.pdf"` sent as raw UTF-8 bytes, as
   browsers do, is kept as is (multer's default would read it as latin1).
 

@@ -104,8 +104,8 @@ instead; a JSON body without file → `400 VALIDATION_ERROR`, `details.file`). M
 
 - **File**: exactly one (`400 TOO_MANY_FILES`), ≤ `MAX_UPLOAD_MB` (`413 FILE_TOO_LARGE`): PDF, PNG, JPEG, WebP, DOCX,
   PPTX; MIME type, extension **and** content (magic bytes) must match (`415 UNSUPPORTED_FILE_TYPE`). Another file
-  field → `400 VALIDATION_ERROR`. Saved through `storageService` under `STORAGE_DIR/marketplace/`; the original
-  (UTF-8) name is kept for downloads.
+  field → `400 VALIDATION_ERROR`. Saved through `storageService` (folder `marketplace`, on disk or in GridFS, see
+  `STORAGE_DRIVER`); the original (UTF-8) name is kept for downloads.
 - Unknown fields are ignored: no mass assignment of `status`, `author`, `rating`, `downloads`, `file`...
 - STUDENT / TEACHER → `PENDING_REVIEW` (the admins are notified, see "Notifications"); ADMIN → `PUBLISHED` at once.
 
@@ -297,7 +297,7 @@ price }`), `PRICE_CHANGED` (409, `details.price`), `FILE_TOO_LARGE` (413), `UNSU
 | `RATE_LIMIT_MARKET_REPORT_MAX` | 20 | reports per user and window |
 | `RATE_LIMIT_MARKET_WINDOW_MS` | 3600000 | window of the two limits |
 | `MARKET_HOLD_TIMEOUT_MS` | 120000 | age after which the recovery job takes over an unfinished purchase |
-| `STORAGE_DIR`, `SCHEDULER_INTERVAL_MS`, `RATE_LIMIT_ENABLED` | | see `backend/README.md` |
+| `STORAGE_DRIVER`, `STORAGE_DIR`, `SCHEDULER_INTERVAL_MS`, `RATE_LIMIT_ENABLED` | | see `backend/README.md` |
 
 ## Demo data — `scripts/seed/70-marketplace.js`
 
