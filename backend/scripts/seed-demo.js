@@ -73,6 +73,9 @@ const STUDENTS = [
   { firstname: 'Yasmine', lastname: 'Haddad', group: '4TWIN1', locale: 'fr' },
   { firstname: 'Omar', lastname: 'Ferchichi', group: '4TWIN1', locale: 'en' },
   { firstname: 'Sarra', lastname: 'Mansouri', group: '4TWIN1', locale: 'fr' },
+  // Two more 4TWIN1 students so the anonymized group comparison (5+ students) can be shown in demos.
+  { firstname: 'Mariem', lastname: 'Jlassi', group: '4TWIN1', locale: 'fr' },
+  { firstname: 'Aziz', lastname: 'Ben Amor', group: '4TWIN1', locale: 'fr' },
   { firstname: 'Ahmed', lastname: 'Karray', group: '4TWIN2', locale: 'fr' },
   { firstname: 'Nour', lastname: 'Chaabane', group: '4TWIN2', locale: 'fr' },
   { firstname: 'Rami', lastname: 'Belhaj', group: '4TWIN2', locale: 'en' },

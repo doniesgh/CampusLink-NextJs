@@ -189,6 +189,15 @@
       },
       "attendance": {
         "update": "Présences modifiées"
+      },
+      "grades": {
+        "assessment": {
+          "create": "Évaluation créée",
+          "update": "Évaluation modifiée",
+          "delete": "Évaluation supprimée"
+        },
+        "publish": "Notes publiées",
+        "update": "Notes modifiées"
       }
     },
     "system": "Système",

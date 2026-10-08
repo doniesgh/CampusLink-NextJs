@@ -57,6 +57,11 @@ const AUDIT_ACTIONS = [
   "forum.unhide",
   "forum.delete",
   "attendance.update",
+  "grades.assessment.create",
+  "grades.assessment.update",
+  "grades.assessment.delete",
+  "grades.publish",
+  "grades.update",
 ] as const;
 
 /** Action codes with a readable label (`admin.audit.actionLabels.<code>`); other codes are shown as they are. */

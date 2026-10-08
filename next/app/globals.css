@@ -37,7 +37,8 @@
 
   --highlight: #f2842f;
   --highlight-foreground: #1f2937;
-  --success: #0f7b5b;
+  /* #0a6b4f: >= 4.5:1 also on the 10% success tint over the grey dashboard background (was #0f7b5b: 4.17:1). */
+  --success: #0a6b4f;
   --success-foreground: #ffffff;
   --destructive: #b91c1c;
   --destructive-foreground: #ffffff;

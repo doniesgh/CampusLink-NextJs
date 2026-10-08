@@ -376,3 +376,11 @@ paint is about 0.9 s. Authenticated pages must be audited with the session in th
   unregisters the service worker; the next route change registers it again.
 - A CSP violation is logged as a console error ("Refused to …" / "violates the following Content Security Policy
   directive"), so the browser guard of the suite also catches them.
+
+## Phase 2 modules
+
+Each phase 2 module documents itself (see also docs/phase2-contract.md):
+
+- [Bookings (module 5)](docs/bookings.md)
+- [Forum (module 4)](docs/forum.md)
+- [Attendance, grades and analytics (module 9)](docs/analytics.md)

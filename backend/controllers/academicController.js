@@ -13,6 +13,7 @@ const {
   readInteger,
   readEnum,
   readObjectId,
+  readBoolean,
 } = require('../utils/validation');
 const auditService = require('../service/auditService');
 
@@ -114,6 +115,11 @@ const parseRoom = async (body, { create }) => {
         : readInteger(body.capacity, 'capacity', details, { min: 1, max: 10000 });
   }
   if (has(body, 'type')) values.type = readEnum(body.type, Room.ROOM_TYPES, 'type', details);
+  // Bookings (phase 2): requiresApproval defaults to true for an amphitheater (model default).
+  if (has(body, 'bookable')) values.bookable = readBoolean(body.bookable, 'bookable', details);
+  if (has(body, 'requiresApproval')) {
+    values.requiresApproval = readBoolean(body.requiresApproval, 'requiresApproval', details);
+  }
   return { values, details };
 };
 
@@ -168,6 +174,7 @@ const RESOURCES = {
         ['users', User.countDocuments({ group: id })],
         ['sessions', countIfRegistered('ClassSession', { groups: id })],
         ['announcements', countIfRegistered('Announcement', { 'audience.groups': id })],
+        ['assessments', countIfRegistered('Assessment', { group: id })],
       ]),
   },
   subjects: {
@@ -177,7 +184,12 @@ const RESOURCES = {
     parse: parseSubject,
     describe: (doc) => `${doc.code} (${doc.name})`,
     duplicate: (values) => (values.code ? { filter: { code: values.code }, field: 'code' } : null),
-    references: (id) => countReferences([['sessions', countIfRegistered('ClassSession', { subject: id })]]),
+    references: (id) =>
+      countReferences([
+        ['sessions', countIfRegistered('ClassSession', { subject: id })],
+        ['forumQuestions', countIfRegistered('ForumQuestion', { subject: id })],
+        ['assessments', countIfRegistered('Assessment', { subject: id })],
+      ]),
   },
   rooms: {
     Model: Room,
@@ -187,7 +199,12 @@ const RESOURCES = {
     describe: (doc) => doc.name,
     duplicate: (values) =>
       values.name ? { filter: { name: values.name }, field: 'name', collation: Room.NAME_COLLATION } : null,
-    references: (id) => countReferences([['sessions', countIfRegistered('ClassSession', { room: id })]]),
+    references: (id) =>
+      countReferences([
+        ['sessions', countIfRegistered('ClassSession', { room: id })],
+        // Upcoming active bookings (phase 2, module 5); past ones keep a snapshot of the room.
+        ['bookings', countIfRegistered('Booking', { room: id, status: { $in: ['PENDING', 'CONFIRMED'] }, endsAt: { $gt: new Date() } })],
+      ]),
   },
 };
 

@@ -71,6 +71,10 @@ scripts/               create-admin, generate-vapid, seed-demo (+ seed/*.js plug
 | the same four routes together | IP (not applied to loopback callers without `X-Forwarded-For`) | `RATE_LIMIT_IP_MAX` (100) |
 | `change-password` | signed-in user | `RATE_LIMIT_PASSWORD_MAX` (10) |
 | `reset-password` | IP (not applied to loopback callers without `X-Forwarded-For`) | `RATE_LIMIT_RESET_MAX` (20) |
+| `POST /api/bookings`, `POST /api/bookings/:id/cancel` (each) | signed-in user (ADMIN cancellations not counted) | `RATE_LIMIT_BOOKING_CREATE_MAX` / `RATE_LIMIT_BOOKING_CANCEL_MAX` (30) per `RATE_LIMIT_BOOKING_WINDOW_MS` (1 h), see `docs/bookings.md` |
+
+Other per-user limits are built with `userRateLimit({ name, limitEnv, defaultLimit, windowEnv, defaultWindowMs, skip })`
+from `middleware/rateLimit.js`, mounted after `requireAuth`.
 
 The per-email limiter runs before the per-IP one, so requests it refuses do not use up the budget of everyone
 behind the same address (campus NAT). `refresh` and `logout` are not limited.
@@ -435,3 +439,11 @@ ctx = {
 Demo accounts: `admin@campuslink.local`, teachers `amira.bensalah@`, `karim.trabelsi@`, `leila.gharbi@` (en),
 `mehdi.jaziri@`, students such as `yasmine.haddad@campuslink.local` (4TWIN1) and `skander.mejri@` (no group),
 alumni `selim.rekik@`; all with the password `Campus123!`.
+
+## Phase 2 modules
+
+Each phase 2 module documents itself (see also docs/phase2-contract.md):
+
+- [Bookings (module 5)](docs/bookings.md)
+- [Forum (module 4)](docs/forum.md)
+- [Attendance, grades and analytics (module 9)](docs/analytics.md)

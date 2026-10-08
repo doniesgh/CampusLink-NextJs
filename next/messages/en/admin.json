@@ -189,6 +189,15 @@
       },
       "attendance": {
         "update": "Attendance updated"
+      },
+      "grades": {
+        "assessment": {
+          "create": "Assessment created",
+          "update": "Assessment updated",
+          "delete": "Assessment deleted"
+        },
+        "publish": "Grades published",
+        "update": "Grades changed"
       }
     },
     "system": "System",
