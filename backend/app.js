@@ -29,6 +29,8 @@ const carpoolRoutes = require('./routes/carpool');
 const marketplaceRoutes = require('./routes/marketplace');
 const alumniRoutes = require('./routes/alumni');
 const realtimeRoutes = require('./routes/realtime');
+const ForumRoutes = require('./routes/forumRoutes');
+
 const realtime = require('./service/realtime');
 
 const REQUIRED_ENV = ['MONGO_URI', 'JWT_SECRET'];
@@ -67,6 +69,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/forum', forumRoutes);
+app.use('/api/forum', ForumRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/grades', gradeRoutes);
 app.use('/api/analytics', analyticsRoutes);
