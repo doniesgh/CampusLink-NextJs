@@ -1,5 +1,7 @@
 allowBuilds:
-  unrs-resolver: set this to true or false
+  '@parcel/watcher': false
+  '@swc/core': false
+  unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@next/env@16.3.7'
   - '@next/eslint-plugin-next@16.3.7'
